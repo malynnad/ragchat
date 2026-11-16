@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:ragchat/app/app_state.dart';
+import 'package:ragchat/app/persona.dart';
 import 'package:ragchat/app/settings.dart';
 import 'package:ragchat/chat/chat_service.dart';
 import 'package:ragchat/rag/model_gateway.dart';
@@ -61,42 +62,30 @@ void main() {
     expect(state.sessionTurns.single.answer, '新答案');
   });
 
-  test('人设：新建→编辑→落盘→删除，且至少保留一张', () async {
+  test('人设：单卡编辑即落盘，system 用新正文，可恢复默认', () async {
     final dir = await Directory.systemTemp.createTemp('ragchat-persona');
     addTearDown(() => dir.delete(recursive: true));
     final state = AppState();
     state.debugSupportDir = dir.path;
-    expect(state.settings.personas().length, 3, reason: '默认三张内置预设');
 
-    final created = await state.createPersona();
-    expect(state.activePersonaCard().id, created.id);
-    expect(state.settings.personas().length, 4);
+    final base = state.activePersonaCard();
+    expect(base.name, '小助', reason: '默认内置第一张');
 
-    await state.upsertPersona(created.copyWith(name: '阿鱼', personality: '话少'));
-    expect(state.activePersonaCard().name, '阿鱼');
-    expect(state.systemPrompt(), contains('你是阿鱼'));
-
-    // 落盘：重新读 settings.json 拿到改过的卡与激活 id。
-    final reloaded = await AppSettings.load(dir.path);
-    final saved = reloaded.personas().firstWhere((c) => c.id == created.id);
-    expect(saved.name, '阿鱼');
-    expect(saved.personality, '话少');
-    expect(reloaded.activePersonaId, created.id);
-
-    // 删掉激活卡 → 回退第一张。
-    expect(await state.deletePersona(created.id), isNull);
-    expect(state.settings.personas().length, 3);
-    expect(state.activePersonaCard().id, state.settings.personas().first.id);
-
-    // 删到只剩一张：拒绝再删。
-    for (final c in state.settings.personas().skip(1).toList()) {
-      await state.deletePersona(c.id);
-    }
-    expect(state.settings.personas().length, 1);
-    expect(
-      await state.deletePersona(state.settings.personas().single.id),
-      '至少保留一张人设',
+    await state.savePersona(
+      base.copyWith(name: '阿鱼', text: '你是阿鱼，话少。'),
     );
+    expect(state.activePersonaCard().name, '阿鱼');
+    expect(state.systemPrompt(), contains('你是阿鱼，话少。'));
+
+    // 落盘只有一张，正文就是刚写的那段。
+    final reloaded = await AppSettings.load(dir.path);
+    expect(reloaded.personas().length, 1);
+    expect(reloaded.personas().single.name, '阿鱼');
+    expect(reloaded.personas().single.text, '你是阿鱼，话少。');
+    expect(reloaded.activePersonaId, base.id);
+
+    await state.resetPersona();
+    expect(state.activePersonaCard().text, builtinPersonas.first.text);
   });
 }
 

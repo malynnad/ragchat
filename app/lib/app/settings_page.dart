@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 
 import '../rag/model_catalog.dart';
+import '../rag/token_budget.dart';
 import '../verify_page.dart';
 import 'app_state.dart';
 import 'format.dart';
@@ -603,8 +604,8 @@ class _CatalogSectionState extends State<_CatalogSection> {
   }
 }
 
-/// 人设卡：点行切换、点「编辑」进编辑器改字段、可新建/删除。
-/// 改动写进 settings.json，下一轮 system 消息立即用新文本。
+/// 人设（单卡）：显示当前这张、进编辑器改正文、可恢复内置预设。
+/// 改完写进 settings.json，下一轮 system 消息立即用新文本。
 class _PersonaSection extends StatelessWidget {
   const _PersonaSection();
 
@@ -615,138 +616,89 @@ class _PersonaSection extends StatelessWidget {
   ) async {
     final edited = await showPersonaEditor(context, initial: card);
     if (edited == null) return;
-    await state.upsertPersona(edited);
+    await state.savePersona(edited);
   }
 
-  Future<void> _create(BuildContext context, AppState state) async {
-    final edited = await showPersonaEditor(context);
-    if (edited == null) return;
-    await state.upsertPersona(edited);
-  }
-
-  Future<void> _delete(
-    BuildContext context,
-    AppState state,
-    PersonaCard card,
-  ) async {
+  Future<void> _reset(BuildContext context, AppState state) async {
     final ok = await showIosConfirm(
       context: context,
-      title: '删除人设',
-      message: '删除「${card.name}」？这张卡就从列表里没了。',
-      confirmLabel: '删除',
+      title: '恢复默认人设',
+      message: '现在写的这段会被内置「${builtinPersonas.first.name}」替换，回不来。',
+      confirmLabel: '替换',
       destructive: true,
     );
-    if (!ok || !context.mounted) return;
-    final err = await state.deletePersona(card.id);
-    if (err != null && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
-    }
+    if (ok) await state.resetPersona();
   }
 
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final cards = state.settings.personas();
-    final active = state.activePersonaCard();
+    final card = state.activePersonaCard();
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     final label = CupertinoColors.label.resolveFrom(context);
-    final accent = CupertinoTheme.of(context).primaryColor;
+    final used = estimateTokens(card.render());
     return IosSection(
       header: '人设',
-      footer: '人设与长期记忆一起注入 system；切换或改完下一轮生效，无需重载模型。',
+      footer: '这一条和长期记忆一起写进 system，共用 800 token 预算；改完下一轮生效。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          for (var i = 0; i < cards.length; i++) ...[
-            if (i > 0) const Divider(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: CupertinoButton(
-                    key: ValueKey('persona-row-${cards[i].id}'),
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    onPressed: () => state.switchPersona(cards[i].id),
-                    child: Row(
-                      children: [
-                        Icon(
-                          cards[i].id == active.id
-                              ? CupertinoIcons.checkmark_circle_fill
-                              : CupertinoIcons.circle,
-                          size: 18,
-                          color: cards[i].id == active.id ? accent : secondary,
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                cards[i].name.isEmpty ? '未命名' : cards[i].name,
-                                style: TextStyle(
-                                  fontSize: kFontBody,
-                                  color: label,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                cards[i].render(),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: kFontCaption,
-                                  color: secondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      card.name.isEmpty ? '未命名' : card.name,
+                      style: TextStyle(fontSize: kFontBody, color: label),
                     ),
-                  ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '≈ $used token',
+                      style: TextStyle(
+                        fontSize: kFontCaption,
+                        color: used > systemBudgetTokens * 0.75
+                            ? CupertinoColors.systemRed.resolveFrom(context)
+                            : secondary,
+                      ),
+                    ),
+                  ],
                 ),
-                CupertinoButton(
-                  key: ValueKey('persona-edit-${cards[i].id}'),
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  minimumSize: Size.zero,
-                  onPressed: () => _edit(context, state, cards[i]),
-                  child: const Text('编辑', style: TextStyle(fontSize: kFontBody)),
+              ),
+              CupertinoButton(
+                key: const ValueKey('persona-edit'),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                minimumSize: Size.zero,
+                onPressed: () => _edit(context, state, card),
+                child: const Text(
+                  '编辑',
+                  style: TextStyle(fontSize: kFontBody),
                 ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            card.render(),
+            maxLines: 4,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: kFontCaption, color: secondary),
+          ),
           const Divider(height: 16),
           Row(
             children: [
               CupertinoButton(
-                key: const ValueKey('persona-create'),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                minimumSize: Size.zero,
-                onPressed: () => _create(context, state),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(CupertinoIcons.add, size: 18),
-                    SizedBox(width: 4),
-                    Text('新建人设', style: TextStyle(fontSize: kFontBody)),
-                  ],
+                key: const ValueKey('persona-reset'),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 6,
                 ),
-              ),
-              const Spacer(),
-              CupertinoButton(
-                key: const ValueKey('persona-delete'),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 minimumSize: Size.zero,
-                onPressed: cards.length <= 1
-                    ? null
-                    : () => _delete(context, state, active),
-                child: Text(
-                  '删除当前',
-                  style: TextStyle(
-                    fontSize: kFontBody,
-                    color: cards.length <= 1
-                        ? secondary
-                        : CupertinoColors.systemRed.resolveFrom(context),
-                  ),
+                onPressed: () => _reset(context, state),
+                child: const Text(
+                  '恢复默认',
+                  style: TextStyle(fontSize: kFontBody),
                 ),
               ),
             ],

@@ -159,58 +159,28 @@ class AppState extends ChangeNotifier {
     return n;
   }
 
-  // ---- 人设卡（US-22）----
+  // ---- 人设（US-22；2026-11-16 收敛为单卡）----
 
-  /// 当前激活的人设卡。
+  /// 当前人设（唯一一张；旧数据多张时取激活那张）。
   PersonaCard activePersonaCard() =>
       settings.activePersona(settings.personas());
 
-  /// 切换激活卡。
-  Future<void> switchPersona(String id) async {
-    settings.activePersonaId = id;
-    await settings.save(_supportDir);
-    notifyListeners();
-  }
-
-  /// 全量保存人设卡列表（增删改后调用）。
-  Future<void> savePersonas(List<PersonaCard> cards) async {
-    settings.personasJson = PersonaCard.encodeList(cards);
-    // 激活卡被删时回退第一张。
-    if (!cards.any((c) => c.id == settings.activePersonaId)) {
-      settings.activePersonaId = cards.firstOrNull?.id ?? 'assistant';
-    }
-    await settings.save(_supportDir);
-    notifyListeners();
-  }
-
-  /// 新建一张空人设并设为激活卡。
-  Future<PersonaCard> createPersona() async {
-    final card = PersonaCard.blank(name: '新的人设 ${settings.personas().length + 1}');
+  /// 保存唯一的人设：正文 + 名字落盘，下一轮 system 立即用新文本。
+  /// 列表里只留这一张，旧的其它卡一并收掉。
+  Future<void> savePersona(PersonaCard card) async {
     settings.activePersonaId = card.id;
-    await savePersonas([...settings.personas(), card]);
-    return card;
+    settings.personasJson = PersonaCard.encodeList([card]);
+    await settings.save(_supportDir);
+    notifyListeners();
   }
 
-  /// 保存单张卡：列表里已有 id 则替换，没有则追加（新建后填完内容走这里）。
-  Future<void> upsertPersona(PersonaCard card) async {
-    final cards = settings.personas();
-    final i = cards.indexWhere((c) => c.id == card.id);
-    if (i >= 0) {
-      cards[i] = card;
-    } else {
-      cards.add(card);
-      settings.activePersonaId = card.id;
-    }
-    await savePersonas(cards);
-  }
-
-  /// 删除一张卡；只剩一张时拒绝删除，返回提示文案（成功返回 null）。
-  Future<String?> deletePersona(String id) async {
-    final cards = settings.personas();
-    if (cards.length <= 1) return '至少保留一张人设';
-    cards.removeWhere((c) => c.id == id);
-    await savePersonas(cards);
-    return null;
+  /// 恢复内置预设（按 id 找，找不到回第一张）。
+  Future<void> resetPersona([String id = 'assistant']) async {
+    final builtin = builtinPersonas.firstWhere(
+      (c) => c.id == id,
+      orElse: () => builtinPersonas.first,
+    );
+    await savePersona(builtin);
   }
 
   /// system 消息文本：人设卡 + 核心记忆（预算内截断），每轮重建。
