@@ -225,7 +225,7 @@ class _MemoryPageState extends State<MemoryPage> {
               ),
             )
           : ListView(
-              padding: const EdgeInsets.fromLTRB(0, 20, 0, 32),
+              padding: const EdgeInsets.fromLTRB(0, 20, 0, 120),
               children: [
                 ArchiveSection(
                   code: '01 / RECORDS',
@@ -242,7 +242,7 @@ class _MemoryPageState extends State<MemoryPage> {
                         horizontal: kPageMargin,
                       ),
                       child: ContentPanel(
-                        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                        padding: const EdgeInsets.all(18),
                         onTap: () => _entryActions(flat[i]),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

@@ -5,7 +5,6 @@ import 'package:path/path.dart' as p;
 
 import '../rag/model_catalog.dart';
 import '../rag/token_budget.dart';
-import '../verify_page.dart';
 import 'app_state.dart';
 import 'format.dart';
 import 'ios_dialogs.dart';
@@ -40,8 +39,6 @@ class SettingsPage extends StatelessWidget {
           _storageSection(context, stats),
           const SizedBox(height: 28),
           _clearButton(context, state),
-          const SizedBox(height: 28),
-          _verifySection(context),
         ],
       ),
     );
@@ -303,11 +300,15 @@ class SettingsPage extends StatelessWidget {
       child: CupertinoButton(
         padding: const EdgeInsets.symmetric(vertical: 14),
         onPressed: () => _confirmClear(context, state),
-        child: Text(
-          '清空聊天数据（二次确认）',
-          style: TextStyle(
-            fontSize: kFontBody,
-            color: CupertinoColors.systemRed.resolveFrom(context),
+        child: SizedBox(
+          width: double.infinity,
+          child: Text(
+            '清空聊天数据（二次确认）',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: kFontBody,
+              color: CupertinoColors.systemRed.resolveFrom(context),
+            ),
           ),
         ),
       ),
@@ -340,43 +341,6 @@ class SettingsPage extends StatelessWidget {
         }
       }
     }
-  }
-
-  Widget _verifySection(BuildContext context) {
-    final label = CupertinoColors.label.resolveFrom(context);
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    return IosSection(
-      contentPadding: EdgeInsets.zero,
-      child: CupertinoButton(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        onPressed: () =>
-            Navigator.of(context)
-                .push(CupertinoPageRoute(builder: (_) => const VerifyPage())),
-        child: Row(
-          children: [
-            Icon(CupertinoIcons.ant, size: 20, color: secondary),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '真机诊断',
-                    style: TextStyle(fontSize: kFontBody, color: label),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'nobodywho 加载 / 测速 / 内存验证页',
-                    style: TextStyle(fontSize: kFontCaption, color: secondary),
-                  ),
-                ],
-              ),
-            ),
-            Icon(CupertinoIcons.chevron_right, size: 18, color: secondary),
-          ],
-        ),
-      ),
-    );
   }
 }
 
@@ -668,10 +632,7 @@ class _PersonaSection extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 8),
                 minimumSize: Size.zero,
                 onPressed: () => _edit(context, state, card),
-                child: const Text(
-                  '编辑',
-                  style: TextStyle(fontSize: kFontBody),
-                ),
+                child: const Text('编辑', style: TextStyle(fontSize: kFontBody)),
               ),
             ],
           ),
@@ -687,10 +648,7 @@ class _PersonaSection extends StatelessWidget {
             children: [
               CupertinoButton(
                 key: const ValueKey('persona-reset'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 6,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 minimumSize: Size.zero,
                 onPressed: () => _reset(context, state),
                 child: const Text(

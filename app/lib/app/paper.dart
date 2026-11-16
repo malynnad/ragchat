@@ -73,6 +73,9 @@ const double kToolbarHeight = 56;
 const double kDockHeight = 54;
 const double kDockItemWidth = 61.33;
 
+/// 悬空 dock 占掉的高度（胶囊 + 安全区留白），底部有输入条的页面自己让位。
+const double kDockReserve = 96;
+
 /// 接触 / 落定（动效只允许这两个主时长）。
 const Duration kContact = Duration(milliseconds: 120);
 const Duration kSettle = Duration(milliseconds: 420);
@@ -243,7 +246,11 @@ class ArchiveSection extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 9),
-              Container(width: 3, height: 3, color: p.ink.withValues(alpha: .55)),
+              Container(
+                width: 3,
+                height: 3,
+                color: p.ink.withValues(alpha: .55),
+              ),
               if (trailing != null) ...[const SizedBox(width: 12), trailing!],
             ],
           ),
@@ -280,7 +287,7 @@ class ContentPanel extends StatefulWidget {
   const ContentPanel({
     super.key,
     required this.child,
-    this.padding = const EdgeInsets.all(16),
+    this.padding = const EdgeInsets.all(18),
     this.onTap,
     this.registration = true,
   });
@@ -314,7 +321,9 @@ class _ContentPanelState extends State<ContentPanel> {
             Positioned.fill(
               child: IgnorePointer(
                 child: CustomPaint(
-                  painter: _RegistrationPainter(color: p.ink.withValues(alpha: .5)),
+                  painter: _RegistrationPainter(
+                    color: p.ink.withValues(alpha: .5),
+                  ),
                 ),
               ),
             ),
@@ -354,8 +363,8 @@ class _RegistrationPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const inset = 0.5;
-    const arm = 7.0;
+    const inset = 2.0;
+    const arm = 5.5;
     final paint = Paint()
       ..color = color
       ..strokeWidth = 0.7
@@ -416,9 +425,9 @@ class LiquidGlass extends StatelessWidget {
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF000000).withValues(alpha: 0.12),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
+                color: const Color(0xFF000000).withValues(alpha: 0.08),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
@@ -606,7 +615,10 @@ class ArchiveHeaderBar extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [p.surface.withValues(alpha: .94), p.surface.withValues(alpha: .72)],
+          colors: [
+            p.surface.withValues(alpha: .94),
+            p.surface.withValues(alpha: .72),
+          ],
         ),
       ),
       child: SafeArea(
@@ -684,24 +696,23 @@ class PaperScaffold extends StatelessWidget {
       backgroundColor: Colors.transparent,
       resizeToAvoidBottomInset: true,
       body: Atmosphere(
-      child: Column(
-        children: [
-          ArchiveHeaderBar(
-            title: title,
-            code: code,
-            leading: leading,
-            actions: actions,
-          ),
-          Expanded(
-            child: scrollable
-                ? ListView(
-                    padding:
-                        padding ??
-                        const EdgeInsets.fromLTRB(0, 20, 0, 32),
-                    children: [content],
-                  )
-                : content,
-          ),
+        child: Column(
+          children: [
+            ArchiveHeaderBar(
+              title: title,
+              code: code,
+              leading: leading,
+              actions: actions,
+            ),
+            Expanded(
+              child: scrollable
+                  ? ListView(
+                      padding:
+                          padding ?? const EdgeInsets.fromLTRB(0, 20, 0, 120),
+                      children: [content],
+                    )
+                  : content,
+            ),
             ?bottomBar,
           ],
         ),

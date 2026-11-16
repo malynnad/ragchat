@@ -54,69 +54,85 @@ class _IosShellState extends State<IosShell> {
     return Scaffold(
       backgroundColor: p.bg,
       body: Atmosphere(
-        child: SafeArea(
-          bottom: false,
-          child: Column(
-            children: [
-              if (state.loadStage.isNotEmpty && !state.gatewayLoaded)
-                _Banner(
-                  child: Row(
-                    children: [
-                      const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CupertinoActivityIndicator(radius: 7),
-                      ),
-                      const SizedBox(width: 9),
-                      Expanded(
-                        child: Text(
-                          state.loadStage,
-                          style: TextStyle(fontSize: kFontCaption, color: p.muted),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              if (state.loadError != null)
-                _Banner(
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          '模型加载失败：${state.loadError}',
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: kFontCaption,
-                            color: const Color(0xFFB3261E),
+        child: Stack(
+          children: [
+            SafeArea(
+              bottom: false,
+              child: Column(
+                children: [
+                  if (state.loadStage.isNotEmpty && !state.gatewayLoaded)
+                    _Banner(
+                      child: Row(
+                        children: [
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CupertinoActivityIndicator(radius: 7),
                           ),
-                        ),
+                          const SizedBox(width: 9),
+                          Expanded(
+                            child: Text(
+                              state.loadStage,
+                              style: TextStyle(
+                                fontSize: kFontCaption,
+                                color: p.muted,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      CupertinoButton(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        minimumSize: Size.zero,
-                        onPressed: state.warmUp,
-                        child: Text(
-                          '重试',
-                          style: TextStyle(fontSize: kFontControl),
-                        ),
+                    ),
+                  if (state.loadError != null)
+                    _Banner(
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '模型加载失败：${state.loadError}',
+                              maxLines: 3,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: kFontCaption,
+                                color: const Color(0xFFB3261E),
+                              ),
+                            ),
+                          ),
+                          CupertinoButton(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: Size.zero,
+                            onPressed: state.warmUp,
+                            child: Text(
+                              '重试',
+                              style: TextStyle(fontSize: kFontControl),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
+                  Expanded(
+                    child: IndexedStack(
+                      index: _index,
+                      children: const [QaPage(), MemoryPage(), SettingsPage()],
+                    ),
                   ),
-                ),
-              Expanded(
-                child: IndexedStack(
-                  index: _index,
-                  children: const [QaPage(), MemoryPage(), SettingsPage()],
+                ],
+              ),
+            ),
+            // 悬空 dock：只有这颗胶囊，没有底衬；内容滚到它下面时被玻璃模糊。
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: IgnorePointer(
+                ignoring: false,
+                child: GlassDock(
+                  selectedIndex: _index,
+                  onSelected: (i) => setState(() => _index = i),
+                  items: _items,
                 ),
               ),
-              GlassDock(
-                selectedIndex: _index,
-                onSelected: (i) => setState(() => _index = i),
-                items: _items,
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -134,7 +150,10 @@ class _Banner extends StatelessWidget {
     final p = paperOf(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: kPageMargin, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: kPageMargin,
+        vertical: 10,
+      ),
       decoration: BoxDecoration(
         color: p.surface,
         border: Border(bottom: BorderSide(color: p.hairline, width: 0.6)),

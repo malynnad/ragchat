@@ -229,7 +229,7 @@ class _QaPageState extends State<QaPage> {
           Expanded(
             child: ListView(
               controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(kPageMargin, 8, kPageMargin, 16),
+              padding: const EdgeInsets.fromLTRB(kPageMargin, 8, kPageMargin, 120),
               children: [
                 if (_entries.isEmpty) _emptyState(p),
                 for (final e in _entries)
@@ -283,7 +283,12 @@ class _QaPageState extends State<QaPage> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(kPageMargin, 8, kPageMargin, 12),
+        padding: const EdgeInsets.fromLTRB(
+          kPageMargin,
+          8,
+          kPageMargin,
+          kDockReserve,
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
@@ -352,7 +357,9 @@ class _QaPageState extends State<QaPage> {
     return Align(
       alignment: Alignment.centerLeft,
       child: ContentPanel(
-        padding: const EdgeInsets.all(14),
+        // 聊天气泡不画四角定位标：消息密度高，标线会贴着首字。
+        registration: false,
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
