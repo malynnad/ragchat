@@ -1,17 +1,14 @@
-// Apple/iOS 风格外壳。
-//
-// 结构（authentic iPhone 应用）：底部常驻标签栏（CupertinoTabBar）一点即切，
-// 各页自带 CupertinoNavigationBar 顶栏（自动避开状态栏）。
-// 不做 macOS 桌面元素（红绿灯 / 菜单栏 / 侧边抽屉）——手机没有窗口管理语义。
-// 标签切换带轻触感；IndexedStack 保留各页状态（会话不丢）。
+// 纸页与档案外壳：纸底 + 三页 IndexedStack + 底部玻璃 dock。
+// 切换只换内容区，各页状态保留（会话不丢）；动效一次性落定，无循环。
 // ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'app_state.dart';
 import 'memory_page.dart';
-import 'motion.dart';
+import 'paper.dart';
 import 'qa_page.dart';
+import 'theme.dart';
 import 'settings_page.dart';
 
 class IosShell extends StatefulWidget {
@@ -24,16 +21,22 @@ class IosShell extends StatefulWidget {
 class _IosShellState extends State<IosShell> {
   int _index = 0;
 
-  static const _titles = ['聊天', '记忆', '设置'];
-  static const _icons = [
-    CupertinoIcons.chat_bubble,
-    CupertinoIcons.person_2,
-    CupertinoIcons.settings,
-  ];
-  static const _activeIcons = [
-    CupertinoIcons.chat_bubble_fill,
-    CupertinoIcons.person_2_fill,
-    CupertinoIcons.settings_solid,
+  static const _items = [
+    GlassDockItem(
+      CupertinoIcons.chat_bubble,
+      '聊天',
+      activeIcon: CupertinoIcons.chat_bubble_fill,
+    ),
+    GlassDockItem(
+      CupertinoIcons.archivebox,
+      '记忆',
+      activeIcon: CupertinoIcons.archivebox_fill,
+    ),
+    GlassDockItem(
+      CupertinoIcons.slider_horizontal_3,
+      '设置',
+      activeIcon: CupertinoIcons.slider_horizontal_3,
+    ),
   ];
 
   @override
@@ -44,77 +47,99 @@ class _IosShellState extends State<IosShell> {
     });
   }
 
-  void _select(int i) {
-    if (i == _index) return;
-    macHaptic();
-    setState(() => _index = i);
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final cup = CupertinoTheme.of(context);
-    final scheme = Theme.of(context).colorScheme;
-
+    final p = paperOf(context);
     return Scaffold(
-      backgroundColor: cup.scaffoldBackgroundColor,
-      body: Column(
-        children: [
-          if (state.loadStage.isNotEmpty && !state.gatewayLoaded)
-            Container(
-              color: scheme.surfaceContainerHighest,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+      backgroundColor: p.bg,
+      body: Atmosphere(
+        child: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              if (state.loadStage.isNotEmpty && !state.gatewayLoaded)
+                _Banner(
+                  child: Row(
+                    children: [
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CupertinoActivityIndicator(radius: 7),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Text(
+                          state.loadStage,
+                          style: TextStyle(fontSize: kFontCaption, color: p.muted),
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(state.loadStage)),
-                ],
-              ),
-            ),
-          if (state.loadError != null)
-            Container(
-              color: scheme.errorContainer,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      '模型加载失败: ${state.loadError}',
-                      maxLines: 3,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: scheme.onErrorContainer),
-                    ),
+                ),
+              if (state.loadError != null)
+                _Banner(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          '模型加载失败：${state.loadError}',
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: kFontCaption,
+                            color: const Color(0xFFB3261E),
+                          ),
+                        ),
+                      ),
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        minimumSize: Size.zero,
+                        onPressed: state.warmUp,
+                        child: Text(
+                          '重试',
+                          style: TextStyle(fontSize: kFontControl),
+                        ),
+                      ),
+                    ],
                   ),
-                  TextButton(onPressed: state.warmUp, child: const Text('重试')),
-                ],
+                ),
+              Expanded(
+                child: IndexedStack(
+                  index: _index,
+                  children: const [QaPage(), MemoryPage(), SettingsPage()],
+                ),
               ),
-            ),
-          Expanded(
-            child: IndexedStack(
-              index: _index,
-              children: const [QaPage(), MemoryPage(), SettingsPage()],
-            ),
+              GlassDock(
+                selectedIndex: _index,
+                onSelected: (i) => setState(() => _index = i),
+                items: _items,
+              ),
+            ],
           ),
-        ],
+        ),
       ),
-      bottomNavigationBar: CupertinoTabBar(
-        currentIndex: _index,
-        onTap: _select,
-        activeColor: cup.primaryColor,
-        items: [
-          for (var i = 0; i < _titles.length; i++)
-            BottomNavigationBarItem(
-              icon: Icon(_icons[i]),
-              activeIcon: Icon(_activeIcons[i]),
-              label: _titles[i],
-            ),
-        ],
+    );
+  }
+}
+
+/// 顶部提示条：纸面 + 发丝底边，不抢层级。
+class _Banner extends StatelessWidget {
+  const _Banner({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = paperOf(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: kPageMargin, vertical: 10),
+      decoration: BoxDecoration(
+        color: p.surface,
+        border: Border(bottom: BorderSide(color: p.hairline, width: 0.6)),
       ),
+      child: child,
     );
   }
 }

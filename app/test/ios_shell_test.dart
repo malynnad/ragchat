@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ragchat/app/app_state.dart';
 import 'package:ragchat/app/home_page.dart';
 import 'package:ragchat/app/ios_dialogs.dart';
+import 'package:ragchat/app/paper.dart';
 import 'package:ragchat/app/settings.dart';
 import 'package:ragchat/app/theme.dart';
 import 'package:ragchat/chat/chat_service.dart';
@@ -46,11 +47,11 @@ void main() {
     await tester.pumpWidget(wrap(state));
     await tester.pumpAndSettle();
 
-    expect(find.byType(CupertinoTabBar), findsOneWidget);
+    expect(find.byType(GlassDock), findsOneWidget);
     expect(find.text('聊天'), findsWidgets);
     expect(find.text('记忆'), findsOneWidget);
-    expect(find.text('设置'), findsOneWidget);
-    expect(find.textContaining('随便聊聊吧'), findsOneWidget);
+    expect(find.text('设置'), findsWidgets);
+    expect(find.textContaining('还没有对话'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

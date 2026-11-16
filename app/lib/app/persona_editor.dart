@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../rag/token_budget.dart';
 import 'ios_widgets.dart';
+import 'paper.dart';
 import 'persona.dart';
 import 'theme.dart';
 
@@ -115,29 +116,19 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cup = CupertinoTheme.of(context);
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final secondary = paperOf(context).muted;
     final used = estimateTokens(_draft.render());
-    return Scaffold(
-      backgroundColor: cup.scaffoldBackgroundColor,
-      appBar: CupertinoNavigationBar(
-        middle: const Text('编辑人设'),
-        border: null,
-        leading: CupertinoButton(
-          padding: EdgeInsets.zero,
-          minimumSize: Size.zero,
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('取消'),
-        ),
-        trailing: CupertinoButton(
-          padding: EdgeInsets.zero,
-          minimumSize: Size.zero,
-          onPressed: _save,
-          child: const Text('保存'),
-        ),
+    return PaperScaffold(
+      title: '编辑人设',
+      code: '03 / PERSONA',
+      leading: GlassTextButton(
+        label: '取消',
+        onPressed: () => Navigator.of(context).pop(),
       ),
-      body: ListView(
-        padding: const EdgeInsets.only(top: 16, bottom: 32),
+      actions: [
+        GlassTextButton(label: '保存', onPressed: _save),
+      ],
+      body: Column(
         children: [
           IosSection(
             header: '人设卡',
@@ -165,7 +156,7 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
           const SizedBox(height: 16),
           IosSection(
             header: '内置样板',
-            footer: '三个人设的写法差别在口癖：换一张，语气就不一样。',
+            footer: '写法的差别在口癖：换一张，语气就不一样。',
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -234,7 +225,7 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
     final over = used > personaSoftBudgetTokens;
     final barColor = over
         ? CupertinoColors.systemRed.resolveFrom(context)
-        : CupertinoTheme.of(context).primaryColor;
+        : paperOf(context).ink;
     final left = personaSoftBudgetTokens - used;
     return IosSection(
       header: 'system 预算',

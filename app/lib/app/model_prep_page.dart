@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'app_state.dart';
 import 'ios_dialogs.dart';
 import 'ios_widgets.dart';
+import 'paper.dart';
 import 'theme.dart';
 
 /// US-1 模型准备页：首启必经。下载（hf-mirror + 进度）或手动导入兜底，
@@ -16,7 +17,8 @@ class ModelPrepPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final cup = CupertinoTheme.of(context);
+    final label = paperOf(context).ink;
+    final p = paperOf(context);
     final chatPaths = state
         .filesForRole(isChat: true)
         .map((f) => f.path)
@@ -25,82 +27,87 @@ class ModelPrepPage extends StatelessWidget {
         .filesForRole(isChat: false)
         .map((f) => f.path)
         .toList();
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    final label = CupertinoColors.label.resolveFrom(context);
-    return Scaffold(
-      backgroundColor: cup.scaffoldBackgroundColor,
-      appBar: CupertinoNavigationBar(middle: const Text('模型准备'), border: null),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+    return PaperScaffold(
+      title: '模型准备',
+      code: '00 / SETUP',
+      body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              '陪聊只需聊天模型。嵌入模型可选，仅用于后续情景记忆；'
-              '准备完成后聊天与记忆全程离线。',
-              style: TextStyle(fontSize: kFontBody, color: secondary),
-            ),
-          ),
-          const SizedBox(height: 16),
-          _roleCard(context, state, isChat: true, paths: chatPaths),
-          const SizedBox(height: 16),
-          _roleCard(context, state, isChat: false, paths: embedPaths),
-          if (state.downloadLabel != null) ...[
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    state.downloadLabel!,
-                    style: TextStyle(fontSize: kFontBody, color: label),
-                  ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: state.downloadProgress,
-                      minHeight: 6,
-                    ),
+          ArchiveSection(
+            code: '00 / PREPARATION',
+            title: '先准备模型',
+            subtitle: '陪聊只需聊天模型。嵌入模型可选，仅用于后续情景记忆；准备完成后聊天与记忆全程离线。',
+            child: Column(
+              children: [
+                _roleCard(context, state, isChat: true, paths: chatPaths),
+                const SizedBox(height: 12),
+                _roleCard(context, state, isChat: false, paths: embedPaths),
+                if (state.downloadLabel != null) ...[
+                  const SizedBox(height: 16),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        state.downloadLabel!,
+                        style: TextStyle(fontSize: kFontBody, color: label),
+                      ),
+                      const SizedBox(height: 6),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: state.downloadProgress,
+                          minHeight: 6,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          _UsbDisclosure(modelsDirPath: state.modelsDirPath),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: CupertinoButton(
-                onPressed: state.rescanModels,
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(CupertinoIcons.refresh, size: 18),
-                    SizedBox(width: 4),
-                    Text('重新扫描'),
-                  ],
+                const SizedBox(height: 12),
+                _UsbDisclosure(modelsDirPath: state.modelsDirPath),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: CupertinoButton(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    onPressed: state.rescanModels,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(CupertinoIcons.refresh, size: 18, color: p.ink),
+                        const SizedBox(width: 9),
+                        Text(
+                          '重新扫描',
+                          style: TextStyle(
+                            fontSize: kFontControl,
+                            color: p.ink,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
       ),
-      bottomNavigationBar: SafeArea(
+      bottomBar: SafeArea(
+        top: false,
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: SizedBox(
-            width: double.infinity,
-            child: CupertinoButton.filled(
-              onPressed: state.modelsReady ? state.confirmModels : null,
+          padding: const EdgeInsets.fromLTRB(kPageMargin, 8, kPageMargin, 12),
+          child: GestureDetector(
+            onTap: state.modelsReady ? state.confirmModels : null,
+            child: Container(
+              height: 54,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: state.modelsReady ? p.ink : p.track,
+                borderRadius: BorderRadius.circular(27),
+              ),
               child: Text(
                 '保存并开始聊天',
                 style: TextStyle(
-                  color: onAccent(CupertinoTheme.of(context).primaryColor),
+                  fontSize: kFontControl,
+                  fontWeight: FontWeight.w600,
+                  color: state.modelsReady ? p.milk : p.muted,
                 ),
               ),
             ),
@@ -126,7 +133,7 @@ class ModelPrepPage extends StatelessWidget {
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     final busy = state.downloadProgress != null;
     return IosSection(
-      header: isChat ? '聊天模型' : '嵌入模型（可选）',
+      header: isChat ? '01 / CHAT MODEL' : '02 / EMBEDDING',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

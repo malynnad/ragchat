@@ -1,12 +1,14 @@
-// Apple/iOS 风格共享组件：分组卡片 / 胶囊标签 / 导航栏动作。
+// 纸页与档案的共享件（原 iOS 分组样式已并入 paper.dart 的纸卡 / 玻璃件）。
 // ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'motion.dart';
+import 'paper.dart';
 import 'theme.dart';
 
-/// iOS 分组列表的「一节」：可选节标题 + 圆角分组卡片 + 可选节脚注。
+/// 设置 / 列表里的一节：小号档案码 + 纸卡 + 可选脚注。
+/// 语义沿用原 IosSection（header / footer / child），视觉换成纸。
 class IosSection extends StatelessWidget {
   const IosSection({
     super.key,
@@ -23,47 +25,60 @@ class IosSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    final card = CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
-      context,
-    );
+    final p = paperOf(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: kPageMargin),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (header != null)
-            Padding(
-              padding: const EdgeInsets.only(left: 16, bottom: 6),
-              child: Text(
-                header!.toUpperCase(),
-                style: TextStyle(fontSize: kFontCaption, color: secondary),
-              ),
+          if (header != null) ...[
+            Row(
+              children: [
+                Text(
+                  header!.toUpperCase(),
+                  textScaler: TextScaler.noScaling,
+                  style: TextStyle(
+                    fontSize: kFontCode,
+                    letterSpacing: 1.05,
+                    fontFamily: 'monospace',
+                    fontWeight: FontWeight.w500,
+                    color: p.muted,
+                  ),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Container(
+                    height: 0.6,
+                    color: p.ink.withValues(alpha: 0.18),
+                  ),
+                ),
+              ],
             ),
-          Container(
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: card,
-              borderRadius: BorderRadius.circular(12),
-            ),
+            const SizedBox(height: 8),
+          ],
+          ContentPanel(
             padding: contentPadding,
+            registration: false,
             child: child,
           ),
-          if (footer != null)
-            Padding(
-              padding: const EdgeInsets.only(left: 16, top: 6, right: 16),
-              child: Text(
-                footer!,
-                style: TextStyle(fontSize: kFontCaption, color: secondary),
+          if (footer != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              footer!,
+              style: TextStyle(
+                fontSize: kFontCaption,
+                height: 1.5,
+                color: p.muted,
               ),
             ),
+          ],
         ],
       ),
     );
   }
 }
 
-/// iOS 胶囊标签（分类过滤 / 检索范围）：选中=强调色实心，未选=卡片底+描边。
+/// 胶囊标签：选中=墨色实心 + 奶白字，未选=透明底 + 发丝描边。
 class IosPill extends StatelessWidget {
   const IosPill({
     super.key,
@@ -78,32 +93,27 @@ class IosPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accent = CupertinoTheme.of(context).primaryColor;
-    final card = CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
-      context,
-    );
-    final labelColor = selected
-        ? onAccent(accent)
-        : CupertinoColors.label.resolveFrom(context);
-    final border = CupertinoColors.separator.resolveFrom(context);
+    final p = paperOf(context);
     return GestureDetector(
       onTap: () {
         macHaptic();
         onTap();
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        duration: const Duration(milliseconds: 120),
+        constraints: const BoxConstraints(minHeight: 48),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? accent : card,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: selected ? accent : border, width: 0.5),
+          color: selected ? p.ink : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: p.hairline, width: 0.7),
         ),
+        alignment: Alignment.center,
         child: Text(
           label,
           style: TextStyle(
-            fontSize: kFontBody,
-            color: labelColor,
+            fontSize: kFontControl,
+            color: selected ? p.milk : p.ink,
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
@@ -112,8 +122,7 @@ class IosPill extends StatelessWidget {
   }
 }
 
-/// 导航栏图标动作（带 Tooltip，便于无障碍与测试定位）。
-/// [onPressed] 为 null 时呈禁用态。
+/// 页头动作（46 宽命中区内的图标按钮，供测试与无障碍定位）。
 class IosNavBarAction extends StatelessWidget {
   const IosNavBarAction({
     super.key,
@@ -130,17 +139,21 @@ class IosNavBarAction extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: CupertinoButton(
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        minimumSize: Size.zero,
-        onPressed: onPressed,
-        child: Icon(icon, size: 22),
+      child: SizedBox(
+        width: 46,
+        height: 46,
+        child: CupertinoButton(
+          padding: EdgeInsets.zero,
+          minimumSize: Size.zero,
+          onPressed: onPressed,
+          child: Icon(icon, size: 21),
+        ),
       ),
     );
   }
 }
 
-/// 水平可滚动的胶囊标签行（分类多时不溢出）。
+/// 水平可滚动的胶囊标签行。
 class IosPillBar extends StatelessWidget {
   const IosPillBar({
     super.key,
@@ -150,7 +163,6 @@ class IosPillBar extends StatelessWidget {
     this.allLabel = '全部',
   });
 
-  /// 不含「全部」的分类列表；null 选中态由 [selected]==null 表示。
   final List<String> labels;
   final String? selected;
   final ValueChanged<String?> onSelected;
@@ -159,10 +171,10 @@ class IosPillBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 44,
+      height: 56,
       child: ListView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: kPageMargin, vertical: 4),
         children: [
           Padding(
             padding: const EdgeInsets.only(right: 8),

@@ -16,7 +16,6 @@ import '../rag/nobodywho_gateway.dart';
 import '../rag/token_budget.dart';
 import 'persona.dart';
 import 'settings.dart';
-import 'theme.dart';
 
 class ModelFile {
   ModelFile(this.path, this.size);
@@ -194,16 +193,6 @@ class AppState extends ChangeNotifier {
     final service = _chatService;
     if (service != null) return service.contextUsage(sessionTurns);
     return sessionUsageEstimate(sessionTurns);
-  }
-
-  /// 当前主题色档位：供 main.dart 注入四个 theme builder。
-  AccentChoice get accent => accentById(settings.accentId);
-
-  /// 切换主题色：先 notify 全 App 即时换色，再异步落盘持久化。
-  Future<void> updateAccent(String id) async {
-    settings.accentId = id;
-    notifyListeners();
-    await settings.save(_supportDir);
   }
 
   /// 扫描手动导入目录 + nobodywho 下载缓存（US-1 两条来源）。

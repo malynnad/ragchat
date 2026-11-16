@@ -29,8 +29,8 @@ class RagKbApp extends StatelessWidget {
     return MaterialApp(
       title: 'RAGchat',
       debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(state.accent.light),
-      darkTheme: buildDarkTheme(state.accent.dark),
+      theme: buildLightTheme(),
+      darkTheme: buildDarkTheme(),
       themeMode: state.themeMode,
       // Cupertino 弹层/控件查找 CupertinoLocalizations；显式补默认 delegate 兜底。
       localizationsDelegates: const [DefaultCupertinoLocalizations.delegate],
@@ -45,8 +45,8 @@ class RagKbApp extends StatelessWidget {
           context,
           child,
           theme: isDark
-              ? buildCupertinoDarkTheme(state.accent.dark)
-              : buildCupertinoLightTheme(state.accent.light),
+              ? buildCupertinoDarkTheme()
+              : buildCupertinoLightTheme(),
         );
       },
       home: AnimatedBuilder(

@@ -12,6 +12,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/gestures.dart';
 
 import 'motion.dart';
+import 'paper.dart';
 
 /// 供 MaterialApp.builder 使用：把 CupertinoTheme 放在根 Navigator 之上，
 /// 使所有路由都能继承 iOS 主题。
@@ -423,9 +424,7 @@ class _IosSheetBodyState<T> extends State<_IosSheetBody<T>>
 
   @override
   Widget build(BuildContext context) {
-    final bg = CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
-      context,
-    );
+    final bg = paperOf(context).surface;
     // 键盘弹出时把弹层整体抬到键盘之上（管理分类输入框不再被挡）。
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
     return LayoutBuilder(
@@ -477,7 +476,7 @@ class _IosSheetBodyState<T> extends State<_IosSheetBody<T>>
                   decoration: BoxDecoration(
                     color: bg,
                     borderRadius: const BorderRadius.vertical(
-                      top: Radius.circular(16),
+                      top: Radius.circular(4),
                     ),
                   ),
                   child: SafeArea(

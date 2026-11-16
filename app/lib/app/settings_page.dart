@@ -10,6 +10,7 @@ import 'app_state.dart';
 import 'format.dart';
 import 'ios_dialogs.dart';
 import 'ios_widgets.dart';
+import 'paper.dart';
 import 'persona.dart';
 import 'persona_editor.dart';
 import 'theme.dart';
@@ -22,30 +23,25 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final cup = CupertinoTheme.of(context);
     final stats = state.storageStats();
-    return Scaffold(
-      backgroundColor: cup.scaffoldBackgroundColor,
-      appBar: CupertinoNavigationBar(middle: const Text('设置'), border: null),
-      body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 16),
+    return PaperScaffold(
+      title: '设置',
+      code: '03 / CONFIG',
+      body: Column(
         children: [
           _modelSection(context, state),
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
           _CatalogSection(state: state),
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
           const _PersonaSection(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
           _gpuSection(context, state),
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
           _storageSection(context, stats),
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
           _clearButton(context, state),
-          const SizedBox(height: 16),
-          const _AccentSection(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 28),
           _verifySection(context),
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -65,7 +61,7 @@ class SettingsPage extends StatelessWidget {
     final busy = state.downloadProgress != null;
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     return IosSection(
-      header: '模型',
+      header: '01 / MODEL',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -219,7 +215,7 @@ class SettingsPage extends StatelessWidget {
     final s = state.settings;
     final label = CupertinoColors.label.resolveFrom(context);
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    final accent = CupertinoTheme.of(context).primaryColor;
+    final accent = paperOf(context).ink;
     return IosSection(
       child: Row(
         children: [
@@ -289,7 +285,7 @@ class SettingsPage extends StatelessWidget {
       ),
     );
     return IosSection(
-      header: '存储占用',
+      header: '04 / STORAGE',
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
@@ -405,7 +401,7 @@ class _CatalogSectionState extends State<_CatalogSection> {
     // v2 bugfix：候选先按类型（生成→嵌入）再按体积升序。
     final sorted = sortedCatalog();
     return IosSection(
-      header: '下载候选模型',
+      header: '02 / CANDIDATES',
       contentPadding: EdgeInsets.zero,
       child: Column(
         children: [
@@ -437,8 +433,8 @@ class _CatalogSectionState extends State<_CatalogSection> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
               child: Text(
-                '体积与备注来自《工作原理与模型选型》；14B 与嵌入 4B 属本机边缘配置，'
-                '下载后需真机验证。嵌入模型在 MVP 中可选。',
+                '只留聊天够用的两档：0.6B 更快，2B 更稳。'
+                '嵌入模型只在 v2 情景记忆时用得上，聊天不必装。',
                 style: TextStyle(fontSize: kFontCaption, color: secondary),
               ),
             ),
@@ -459,7 +455,7 @@ class _CatalogSectionState extends State<_CatalogSection> {
   }) {
     final label = CupertinoColors.label.resolveFrom(context);
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    final accent = CupertinoTheme.of(context).primaryColor;
+    final accent = paperOf(context).ink;
     final divider = CupertinoColors.separator.resolveFrom(context);
     final urlName = p.basename(m.url).toLowerCase();
     final downloaded = state.modelFiles.any(
@@ -638,7 +634,7 @@ class _PersonaSection extends StatelessWidget {
     final label = CupertinoColors.label.resolveFrom(context);
     final used = estimateTokens(card.render());
     return IosSection(
-      header: '人设',
+      header: '03 / PERSONA',
       footer:
           '只有这一张，和长期记忆共用 800 token 的 system 预算（人设建议 ≤$personaSoftBudgetTokens）；改完下一轮生效。',
       child: Column(
@@ -705,72 +701,6 @@ class _PersonaSection extends StatelessWidget {
             ],
           ),
         ],
-      ),
-    );
-  }
-}
-
-/// v2 主题色设置：圆形色块一排，选中描边+对勾，点按即换色并持久化。
-/// 色板单点在 theme.dart（kAccents），全 App 经 primaryColor 自动跟随。
-class _AccentSection extends StatelessWidget {
-  const _AccentSection();
-
-  @override
-  Widget build(BuildContext context) {
-    final state = AppStateScope.of(context);
-    final isDark = CupertinoTheme.brightnessOf(context) == Brightness.dark;
-    final label = CupertinoColors.label.resolveFrom(context);
-    final selectedId = state.settings.accentId;
-    return IosSection(
-      header: '主题颜色',
-      footer: '全局强调色，亮/暗模式自动配对应色值，选择后立即生效并保存。',
-      child: Wrap(
-        spacing: 14,
-        runSpacing: 14,
-        children: [
-          for (final a in kAccents)
-            _swatch(
-              a,
-              selected: a.id == selectedId,
-              isDark: isDark,
-              ring: label,
-              onTap: () => state.updateAccent(a.id),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _swatch(
-    AccentChoice a, {
-    required bool selected,
-    required bool isDark,
-    required Color ring,
-    required VoidCallback onTap,
-  }) {
-    final color = isDark ? a.dark : a.light;
-    return Semantics(
-      label: '主题色 ${a.label}',
-      button: true,
-      selected: selected,
-      child: CupertinoButton(
-        key: ValueKey('accent-${a.id}'),
-        padding: EdgeInsets.zero,
-        minimumSize: Size.zero,
-        onPressed: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-            border: selected ? Border.all(color: ring, width: 2) : null,
-          ),
-          child: selected
-              ? Icon(CupertinoIcons.checkmark, color: onAccent(color), size: 18)
-              : null,
-        ),
       ),
     );
   }

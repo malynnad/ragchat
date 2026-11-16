@@ -93,14 +93,14 @@ void main() {
       child: AnimatedBuilder(
         animation: state,
         builder: (_, _) => MaterialApp(
-          theme: buildLightTheme(state.accent.light),
+          theme: buildLightTheme(),
           localizationsDelegates: const [
             DefaultCupertinoLocalizations.delegate,
           ],
           builder: (c, child) => iosAppBuilder(
             c,
             child,
-            theme: buildCupertinoLightTheme(state.accent.light),
+            theme: buildCupertinoLightTheme(),
           ),
           home: const SettingsPage(),
         ),
@@ -111,8 +111,8 @@ void main() {
       final dir = Directory.systemTemp.createTempSync('ring_ui');
       addTearDown(() => dir.deleteSync(recursive: true));
       final state = await buildState(dir);
-      final embed4 = modelCatalog.firstWhere(
-        (m) => !m.isChat && m.label.contains('4B'),
+      final downloading = modelCatalog.firstWhere(
+        (m) => m.isChat && m.label.contains('0.6B'),
       );
       final embed06 = modelCatalog.firstWhere(
         (m) => !m.isChat && m.label.contains('0.6B'),
@@ -121,8 +121,8 @@ void main() {
       state.modelFiles.add(
         ModelFile(p.join(dir.path, p.basename(embed06.url)), 1),
       );
-      // 正在下载：4B → 圆环 40%。
-      state.downloadingUrl = embed4.url;
+      // 正在下载：聊天 0.6B → 圆环 40%。
+      state.downloadingUrl = downloading.url;
       state.downloadProgress = 0.4;
 
       await tester.pumpWidget(wrap(state));

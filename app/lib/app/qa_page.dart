@@ -9,6 +9,7 @@ import '../rag/models.dart';
 import 'app_state.dart';
 import 'ios_dialogs.dart';
 import 'ios_widgets.dart';
+import 'paper.dart';
 import 'theme.dart';
 
 /// 聊天页（US-18）：气泡 / 流式 / 停止 / 上下文占用 / 新对话。
@@ -201,58 +202,41 @@ class _QaPageState extends State<QaPage> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final cup = CupertinoTheme.of(context);
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final p = paperOf(context);
     final usage = state.contextUsage();
     final usageColor = usage >= 1
-        ? CupertinoColors.systemRed.resolveFrom(context)
+        ? const Color(0xFFB3261E)
         : usage >= 0.75
-        ? CupertinoColors.systemOrange.resolveFrom(context)
-        : secondary;
-    return Scaffold(
-      backgroundColor: cup.scaffoldBackgroundColor,
-      appBar: CupertinoNavigationBar(
-        middle: const Text('聊天'),
-        border: null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Tooltip(
-              message: '会话上下文占用：历史聊天 / 可用预算\n满后需开启新对话',
-              child: Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: Text(
-                  '${(usage * 100).round()}%',
-                  style: TextStyle(fontSize: kFontCaption, color: usageColor),
-                ),
-              ),
-            ),
-            IosNavBarAction(
-              icon: CupertinoIcons.add_circled,
-              tooltip: '新对话',
-              onPressed: _busy ? null : () => _newConversation(),
-            ),
-          ],
+        ? p.ink
+        : p.muted;
+    return PaperScaffold(
+      title: '聊天',
+      code: '01 / CONVERSATION',
+      scrollable: false,
+      actions: [
+        Text(
+          '${(usage * 100).round()}%',
+          style: TextStyle(fontSize: kFontCode, color: usageColor),
         ),
-      ),
+        IosNavBarAction(
+          icon: CupertinoIcons.add_circled,
+          tooltip: '新对话',
+          onPressed: _busy ? null : () => _newConversation(),
+        ),
+      ],
       body: Column(
         children: [
           Expanded(
             child: ListView(
               controller: _scroll,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(kPageMargin, 8, kPageMargin, 16),
               children: [
-                if (_entries.isEmpty)
+                if (_entries.isEmpty) _emptyState(p),
+                for (final e in _entries)
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 32),
-                    child: Text(
-                      '随便聊聊吧。\n\n我会记住你告诉我的重要事情；'
-                      '开启新对话时会自动整理记忆。\n上下文将满时请开启新对话。',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: kFontBody, color: secondary),
-                    ),
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _entryWidget(e),
                   ),
-                for (final e in _entries) _entryWidget(e),
               ],
             ),
           ),
@@ -262,64 +246,79 @@ class _QaPageState extends State<QaPage> {
     );
   }
 
-  Widget _inputBar(BuildContext context) {
-    final card = CupertinoColors.secondarySystemGroupedBackground.resolveFrom(
-      context,
+  /// 空状态三段式：一句状态 + 一句范围 + 一句动作。
+  Widget _emptyState(PaperPalette p) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48),
+      child: Column(
+        children: [
+          Icon(
+            CupertinoIcons.paperplane,
+            size: 34,
+            color: p.ink.withValues(alpha: .35),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            '还没有对话',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.3,
+              color: p.ink,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '说点什么就会记在这里。开启新对话时会自动整理记忆。',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: kFontCaption, height: 1.6, color: p.muted),
+          ),
+        ],
+      ),
     );
-    final border = CupertinoColors.separator.resolveFrom(context);
-    final label = CupertinoColors.label.resolveFrom(context);
+  }
+
+  Widget _inputBar(BuildContext context) {
+    final p = paperOf(context);
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.fromLTRB(kPageMargin, 8, kPageMargin, 12),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Expanded(
-              child: CupertinoTextField(
-                controller: _controller,
-                minLines: 1,
-                maxLines: 4,
-                textInputAction: TextInputAction.newline,
-                placeholder: '说点什么…',
-                style: TextStyle(fontSize: kFontBody, color: label),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 10,
-                ),
+              child: Container(
                 decoration: BoxDecoration(
-                  color: card,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: border, width: 0.5),
+                  color: p.surface,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: p.hairline, width: 0.7),
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: CupertinoTextField(
+                  controller: _controller,
+                  minLines: 1,
+                  maxLines: 4,
+                  textInputAction: TextInputAction.newline,
+                  placeholder: '说点什么',
+                  placeholderStyle: TextStyle(
+                    fontSize: kFontBody,
+                    color: p.muted,
+                  ),
+                  style: TextStyle(fontSize: kFontBody, color: p.ink),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: const BoxDecoration(),
                 ),
               ),
             ),
             const SizedBox(width: 8),
-            _busy
-                ? CupertinoButton(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    color: CupertinoColors.systemGrey.resolveFrom(context),
-                    onPressed: () => AppStateScope.of(context).stopGeneration(),
-                    child: const Text(
-                      '停止',
-                      style: TextStyle(color: CupertinoColors.white),
-                    ),
-                  )
-                : CupertinoButton.filled(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    onPressed: _ask,
-                    child: Icon(
-                      CupertinoIcons.arrow_up,
-                      size: 20,
-                      color: onAccent(CupertinoTheme.of(context).primaryColor),
-                    ),
-                  ),
+            if (_busy)
+              GlassTextButton(
+                label: '停止',
+                onPressed: () => AppStateScope.of(context).stopGeneration(),
+              )
+            else
+              _SendButton(onPressed: _ask),
           ],
         ),
       ),
@@ -327,27 +326,24 @@ class _QaPageState extends State<QaPage> {
   }
 
   Widget _entryWidget(Object e) {
-    final accent = CupertinoTheme.of(context).primaryColor;
-    final assistantBg = CupertinoColors.secondarySystemGroupedBackground
-        .resolveFrom(context);
+    final p = paperOf(context);
     if (e is _UserEntry) {
       return Align(
         alignment: Alignment.centerRight,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 12, left: 48),
+          margin: const EdgeInsets.only(left: 48),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: accent,
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              topRight: Radius.circular(16),
-              bottomLeft: Radius.circular(16),
-              bottomRight: Radius.circular(4),
-            ),
+            color: p.ink,
+            borderRadius: BorderRadius.circular(4),
           ),
           child: Text(
             e.text,
-            style: TextStyle(fontSize: kFontBody, color: onAccent(accent)),
+            style: TextStyle(
+              fontSize: kFontBody,
+              height: 1.5,
+              color: p.milk,
+            ),
           ),
         ),
       );
@@ -355,52 +351,26 @@ class _QaPageState extends State<QaPage> {
     final a = e as _AssistantEntry;
     return Align(
       alignment: Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 12, right: 24),
+      child: ContentPanel(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: assistantBg,
-          borderRadius: const BorderRadius.only(
-            topLeft: Radius.circular(16),
-            topRight: Radius.circular(16),
-            bottomLeft: Radius.circular(4),
-            bottomRight: Radius.circular(16),
-          ),
-        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
             if (a.contextFull)
-              _noticeRow(
-                icon: CupertinoIcons.hourglass,
-                tint: CupertinoColors.systemOrange.resolveFrom(context),
-                text: '上下文将满，本轮未生成。请开启新对话。',
-              ),
+              _noticeRow(icon: CupertinoIcons.hourglass, text: '上下文将满，本轮未生成。请开启新对话。'),
             if (a.error)
-              _noticeRow(
-                icon: CupertinoIcons.exclamationmark_circle,
-                tint: CupertinoColors.systemRed.resolveFrom(context),
-                text: '生成失败，请重试。',
-              ),
+              _noticeRow(icon: CupertinoIcons.exclamationmark_circle, text: '生成失败，请重试。'),
             if (!a.busy && a.answer.isEmpty && !a.error && !a.contextFull)
-              _noticeRow(
-                icon: CupertinoIcons.stop_circle,
-                tint: CupertinoColors.secondaryLabel.resolveFrom(context),
-                text: '本轮未生成回复（可能已停止）。',
-              ),
+              _noticeRow(icon: CupertinoIcons.stop_circle, text: '本轮未生成回复（可能已停止）。'),
             if (a.answer.isNotEmpty)
               Text(
                 a.answer,
-                style: TextStyle(
-                  fontSize: kFontBody,
-                  height: 1.4,
-                  color: CupertinoColors.label.resolveFrom(context),
-                ),
+                style: TextStyle(fontSize: kFontBody, height: 1.6, color: p.ink),
               ),
             if (a.busy)
-              const Padding(
-                padding: EdgeInsets.only(top: 8),
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
                 child: SizedBox(
                   width: 14,
                   height: 14,
@@ -458,33 +428,71 @@ class _QaPageState extends State<QaPage> {
     await Clipboard.setData(ClipboardData(text: a.answer));
   }
 
-  Widget _noticeRow({
-    required IconData icon,
-    required Color tint,
-    required String text,
-  }) {
+  Widget _noticeRow({required IconData icon, required String text}) {
+    final p = paperOf(context);
     return Container(
-      margin: const EdgeInsets.only(bottom: 4),
+      margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: tint.withValues(alpha: 0.14),
-        borderRadius: BorderRadius.circular(10),
+        color: p.raisedHigh,
+        borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: tint),
-          const SizedBox(width: 8),
+          Icon(icon, size: 17, color: p.muted),
+          const SizedBox(width: 9),
           Expanded(
             child: Text(
               text,
-              style: TextStyle(
-                fontSize: kFontBody,
-                color: CupertinoColors.label.resolveFrom(context),
-              ),
+              style: TextStyle(fontSize: kFontCaption, height: 1.5, color: p.ink),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 发送：46 圆形墨块 + 奶白箭头（控件用胶囊/圆形，纸面板才用 4 圆角）。
+class _SendButton extends StatefulWidget {
+  const _SendButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  State<_SendButton> createState() => _SendButtonState();
+}
+
+class _SendButtonState extends State<_SendButton> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = paperOf(context);
+    return Semantics(
+      label: '发送',
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) {
+          if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return;
+          setState(() => _down = true);
+        },
+        onTapCancel: () => setState(() => _down = false),
+        onTapUp: (_) => setState(() => _down = false),
+        onTap: widget.onPressed,
+        child: AnimatedScale(
+          scale: _down ? .97 : 1,
+          duration: _down ? kContact : kSettle,
+          curve: kSettleCurve,
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: p.ink, shape: BoxShape.circle),
+            child: Icon(CupertinoIcons.arrow_up, size: 20, color: p.milk),
+          ),
+        ),
       ),
     );
   }

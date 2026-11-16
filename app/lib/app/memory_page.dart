@@ -6,6 +6,7 @@ import '../chat/app_db.dart';
 import 'app_state.dart';
 import 'ios_dialogs.dart';
 import 'ios_widgets.dart';
+import 'paper.dart';
 import 'theme.dart';
 
 /// 记忆页（US-21）：按 kind 分组的记忆列表 + 手动提取 + 导出导入入口。
@@ -164,110 +165,136 @@ class _MemoryPageState extends State<MemoryPage> {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final cup = CupertinoTheme.of(context);
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    final label = CupertinoColors.label.resolveFrom(context);
-    final groups = {
-      for (final kind in MemoryKind.values)
-        kind: state.memories.where((m) => m.kind == kind).toList(),
-    };
-
-    return Scaffold(
-      backgroundColor: cup.scaffoldBackgroundColor,
-      appBar: CupertinoNavigationBar(
-        middle: const Text('记忆'),
-        border: null,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _extracting
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CupertinoActivityIndicator(),
-                  )
-                : IosNavBarAction(
-                    icon: CupertinoIcons.arrow_clockwise,
-                    tooltip: '从当前会话提取记忆',
-                    onPressed: _extract,
-                  ),
-          ],
-        ),
-      ),
+    final p = paperOf(context);
+    final flat = state.memories;
+    return PaperScaffold(
+      title: '记忆',
+      code: '02 / MEMORY',
+      scrollable: false,
+      actions: [
+        _extracting
+            ? const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 8),
+                child: SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CupertinoActivityIndicator(),
+                ),
+              )
+            : IosNavBarAction(
+                icon: CupertinoIcons.arrow_clockwise,
+                tooltip: '从当前会话提取记忆',
+                onPressed: _extract,
+              ),
+      ],
       body: state.memories.isEmpty
           ? Center(
               child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Text(
-                  '还没有记忆。\n\n聊天后点右上角按钮从会话提取，\n或开启新对话时自动提取。'
-                  '\n记忆会常驻注入聊天，可随时编辑、停用、删除。',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: kFontBody, color: secondary),
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      CupertinoIcons.archivebox,
+                      size: 34,
+                      color: p.ink.withValues(alpha: .35),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      '还没有记忆',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.3,
+                        color: p.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '聊过几轮后从会话里提取，或开启新对话时自动整理。'
+                      '记忆会常驻注入聊天，可随时编辑、停用、删除。',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: kFontCaption,
+                        height: 1.6,
+                        color: p.muted,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             )
           : ListView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(0, 20, 0, 32),
               children: [
-                for (final kind in MemoryKind.values)
-                  if (groups[kind]!.isNotEmpty)
-                    IosSection(
-                      header: _kindLabels[kind]!,
-                      child: Column(
-                        children: [
-                          for (final m in groups[kind]!)
-                            _memoryRow(m, label, secondary),
-                        ],
+                ArchiveSection(
+                  code: '01 / RECORDS',
+                  title: '记忆条目',
+                  subtitle: '共 ${flat.length} 条；点一条可编辑、停用或删除',
+                  child: const SizedBox.shrink(),
+                ),
+                const SizedBox(height: 8),
+                for (var i = 0; i < flat.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: kPageMargin,
+                      ),
+                      child: ContentPanel(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                        onTap: () => _entryActions(flat[i]),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                ArchiveCode(
+                                  'WK-${(i + 1).toString().padLeft(5, '0')}',
+                                ),
+                                const SizedBox(width: 9),
+                                Text(
+                                  _kindLabels[flat[i].kind]!,
+                                  style: TextStyle(
+                                    fontSize: kFontCode,
+                                    letterSpacing: 1.05,
+                                    color: p.muted,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Icon(
+                                  CupertinoIcons.chevron_up_chevron_down,
+                                  size: 14,
+                                  color: p.muted,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              flat[i].content,
+                              style: TextStyle(
+                                fontSize: kFontBody,
+                                height: 1.5,
+                                color: flat[i].active ? p.ink : p.muted,
+                              ),
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              '重要度 ${flat[i].importance}'
+                              '${flat[i].active ? '' : ' · 已停用'}',
+                              style: TextStyle(
+                                fontSize: kFontCode,
+                                letterSpacing: 1.05,
+                                color: p.muted,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
+                  ),
               ],
             ),
-    );
-  }
-
-  Widget _memoryRow(MemoryEntry m, Color label, Color secondary) {
-    return GestureDetector(
-      onTap: () => _entryActions(m),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: CupertinoColors.separator.resolveFrom(context),
-              width: 0.5,
-            ),
-          ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    m.content,
-                    style: TextStyle(
-                      fontSize: kFontBody,
-                      color: m.active ? label : secondary,
-                      fontStyle: m.active ? FontStyle.normal : FontStyle.italic,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '重要度 ${m.importance}${m.active ? '' : ' · 已停用'}',
-                    style: TextStyle(fontSize: kFontCaption, color: secondary),
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              CupertinoIcons.chevron_up_chevron_down,
-              size: 14,
-              color: secondary,
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
