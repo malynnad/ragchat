@@ -175,7 +175,7 @@ class AppState extends ChangeNotifier {
   }
 
   /// 恢复内置预设（按 id 找，找不到回第一张）。
-  Future<void> resetPersona([String id = 'assistant']) async {
+  Future<void> resetPersona([String id = 'dafeiyu']) async {
     final builtin = builtinPersonas.firstWhere(
       (c) => c.id == id,
       orElse: () => builtinPersonas.first,

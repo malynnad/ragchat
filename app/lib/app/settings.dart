@@ -12,7 +12,7 @@ class AppSettings {
     this.confirmed = false,
     this.chatModelPath,
     this.embedModelPath,
-    this.activePersonaId = 'assistant',
+    this.activePersonaId = 'dafeiyu',
     this.personasJson,
     this.accentId = 'blue',
   });
@@ -60,7 +60,7 @@ class AppSettings {
         activePersonaId:
             j['activePersonaId'] as String? ??
             j['personaId'] as String? ?? // v2 旧字段名兼容
-            'assistant',
+            'dafeiyu',
         personasJson: j['personasJson'] as String?,
         accentId: j['accentId'] as String? ?? 'blue',
       );

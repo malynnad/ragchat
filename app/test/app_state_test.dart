@@ -68,7 +68,7 @@ void main() {
     state.debugSupportDir = dir.path;
 
     final base = state.activePersonaCard();
-    expect(base.name, '小助', reason: '默认内置第一张');
+    expect(base.name, '大肥鱼', reason: '默认内置第一张');
 
     await state.savePersona(
       base.copyWith(name: '阿鱼', personality: '话少，爱吃白饭'),
@@ -85,8 +85,8 @@ void main() {
     expect(reloaded.activePersonaId, base.id);
 
     await state.resetPersona();
-    expect(state.activePersonaCard().name, '小助');
-    expect(state.activePersonaCard().catchphrase, '行；这就来');
+    expect(state.activePersonaCard().name, '大肥鱼');
+    expect(state.activePersonaCard().catchphrase, contains('才不是'));
   });
 }
 
