@@ -9,6 +9,8 @@ import 'app_state.dart';
 import 'format.dart';
 import 'ios_dialogs.dart';
 import 'ios_widgets.dart';
+import 'persona.dart';
+import 'persona_editor.dart';
 import 'theme.dart';
 
 /// 设置：模型切换/候选下载、人设卡、后端开关、存储占用、
@@ -601,9 +603,45 @@ class _CatalogSectionState extends State<_CatalogSection> {
   }
 }
 
-/// 人设卡切换：当前卡渲染进下一轮 system 消息，无需重载模型。
+/// 人设卡：点行切换、点「编辑」进编辑器改字段、可新建/删除。
+/// 改动写进 settings.json，下一轮 system 消息立即用新文本。
 class _PersonaSection extends StatelessWidget {
   const _PersonaSection();
+
+  Future<void> _edit(
+    BuildContext context,
+    AppState state,
+    PersonaCard card,
+  ) async {
+    final edited = await showPersonaEditor(context, initial: card);
+    if (edited == null) return;
+    await state.upsertPersona(edited);
+  }
+
+  Future<void> _create(BuildContext context, AppState state) async {
+    final edited = await showPersonaEditor(context);
+    if (edited == null) return;
+    await state.upsertPersona(edited);
+  }
+
+  Future<void> _delete(
+    BuildContext context,
+    AppState state,
+    PersonaCard card,
+  ) async {
+    final ok = await showIosConfirm(
+      context: context,
+      title: '删除人设',
+      message: '删除「${card.name}」？这张卡就从列表里没了。',
+      confirmLabel: '删除',
+      destructive: true,
+    );
+    if (!ok || !context.mounted) return;
+    final err = await state.deletePersona(card.id);
+    if (err != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -611,38 +649,107 @@ class _PersonaSection extends StatelessWidget {
     final cards = state.settings.personas();
     final active = state.activePersonaCard();
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final label = CupertinoColors.label.resolveFrom(context);
+    final accent = CupertinoTheme.of(context).primaryColor;
     return IosSection(
       header: '人设',
-      footer: '人设与长期记忆一起注入 system；切换后下一轮生效。',
+      footer: '人设与长期记忆一起注入 system；切换或改完下一轮生效，无需重载模型。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(
-            width: double.infinity,
-            child: CupertinoSlidingSegmentedControl<String>(
-              groupValue: active.id,
-              children: {
-                for (final card in cards)
-                  card.id: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 6,
-                    ),
-                    child: Text(
-                      card.name,
-                      style: const TextStyle(fontSize: kFontBody),
+          for (var i = 0; i < cards.length; i++) ...[
+            if (i > 0) const Divider(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: CupertinoButton(
+                    key: ValueKey('persona-row-${cards[i].id}'),
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    onPressed: () => state.switchPersona(cards[i].id),
+                    child: Row(
+                      children: [
+                        Icon(
+                          cards[i].id == active.id
+                              ? CupertinoIcons.checkmark_circle_fill
+                              : CupertinoIcons.circle,
+                          size: 18,
+                          color: cards[i].id == active.id ? accent : secondary,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                cards[i].name.isEmpty ? '未命名' : cards[i].name,
+                                style: TextStyle(
+                                  fontSize: kFontBody,
+                                  color: label,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                cards[i].render(),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: kFontCaption,
+                                  color: secondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-              },
-              onValueChanged: (id) {
-                if (id != null) state.switchPersona(id);
-              },
+                ),
+                CupertinoButton(
+                  key: ValueKey('persona-edit-${cards[i].id}'),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  minimumSize: Size.zero,
+                  onPressed: () => _edit(context, state, cards[i]),
+                  child: const Text('编辑', style: TextStyle(fontSize: kFontBody)),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            active.render(),
-            style: TextStyle(fontSize: kFontCaption, color: secondary),
+          ],
+          const Divider(height: 16),
+          Row(
+            children: [
+              CupertinoButton(
+                key: const ValueKey('persona-create'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                minimumSize: Size.zero,
+                onPressed: () => _create(context, state),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.add, size: 18),
+                    SizedBox(width: 4),
+                    Text('新建人设', style: TextStyle(fontSize: kFontBody)),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              CupertinoButton(
+                key: const ValueKey('persona-delete'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                minimumSize: Size.zero,
+                onPressed: cards.length <= 1
+                    ? null
+                    : () => _delete(context, state, active),
+                child: Text(
+                  '删除当前',
+                  style: TextStyle(
+                    fontSize: kFontBody,
+                    color: cards.length <= 1
+                        ? secondary
+                        : CupertinoColors.systemRed.resolveFrom(context),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

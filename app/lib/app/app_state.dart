@@ -183,6 +183,36 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 新建一张空人设并设为激活卡。
+  Future<PersonaCard> createPersona() async {
+    final card = PersonaCard.blank(name: '新的人设 ${settings.personas().length + 1}');
+    settings.activePersonaId = card.id;
+    await savePersonas([...settings.personas(), card]);
+    return card;
+  }
+
+  /// 保存单张卡：列表里已有 id 则替换，没有则追加（新建后填完内容走这里）。
+  Future<void> upsertPersona(PersonaCard card) async {
+    final cards = settings.personas();
+    final i = cards.indexWhere((c) => c.id == card.id);
+    if (i >= 0) {
+      cards[i] = card;
+    } else {
+      cards.add(card);
+      settings.activePersonaId = card.id;
+    }
+    await savePersonas(cards);
+  }
+
+  /// 删除一张卡；只剩一张时拒绝删除，返回提示文案（成功返回 null）。
+  Future<String?> deletePersona(String id) async {
+    final cards = settings.personas();
+    if (cards.length <= 1) return '至少保留一张人设';
+    cards.removeWhere((c) => c.id == id);
+    await savePersonas(cards);
+    return null;
+  }
+
   /// system 消息文本：人设卡 + 核心记忆（预算内截断），每轮重建。
   String systemPrompt() => ChatService.buildSystemPromptWithinBudget(
     activePersonaCard(),

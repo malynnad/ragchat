@@ -15,6 +15,12 @@ class PersonaCard {
   final String id;
   final String name;
 
+  /// 新建一张空卡：id 用时间戳生成，不会撞上内置 id（assistant/companion/tutor）。
+  factory PersonaCard.blank({String name = '新的人设'}) => PersonaCard(
+    id: 'p${DateTime.now().microsecondsSinceEpoch}',
+    name: name,
+  );
+
   /// 性格描述：如「温柔耐心，喜欢倾听」。
   final String personality;
 
