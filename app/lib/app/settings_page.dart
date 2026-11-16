@@ -639,7 +639,8 @@ class _PersonaSection extends StatelessWidget {
     final used = estimateTokens(card.render());
     return IosSection(
       header: '人设',
-      footer: '这一条和长期记忆一起写进 system，共用 800 token 预算；改完下一轮生效。',
+      footer:
+          '只有这一张，和长期记忆共用 800 token 的 system 预算（人设建议 ≤$personaSoftBudgetTokens）；改完下一轮生效。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -658,7 +659,7 @@ class _PersonaSection extends StatelessWidget {
                       '≈ $used token',
                       style: TextStyle(
                         fontSize: kFontCaption,
-                        color: used > systemBudgetTokens * 0.75
+                        color: used > personaSoftBudgetTokens
                             ? CupertinoColors.systemRed.resolveFrom(context)
                             : secondary,
                       ),

@@ -8,21 +8,23 @@ import 'package:test/test.dart';
 /// US-22 人设卡：渲染、序列化、切换；ADR-0009 设置兼容（旧字段容忍、写入丢弃）。
 void main() {
   group('PersonaCard', () {
-    test('render：五要素齐全时全部渲染，空字段跳过', () {
+    test('render：字段齐全时全部渲染，空字段跳过', () {
       const full = PersonaCard(
         id: 'x',
         name: '小暖',
         personality: '温柔耐心',
         style: '口语化',
+        catchphrase: '嗯，我在',
         addressTerm: '你',
         boundary: '不给医疗建议',
       );
       final r = full.render();
       expect(r, contains('你是小暖'));
       expect(r, contains('性格：温柔耐心'));
-      expect(r, contains('说话风格：口语化'));
+      expect(r, contains('说话：口语化'));
+      expect(r, contains('常说：「嗯，我在」'));
       expect(r, contains('称呼用户为「你」'));
-      expect(r, contains('边界：不给医疗建议'));
+      expect(r, contains('不做：不给医疗建议'));
 
       const minimal = PersonaCard(id: 'y', name: '小助');
       expect(minimal.render(), '你是小助。', reason: '无附加字段时只报名字');
@@ -32,6 +34,16 @@ void main() {
         '',
         reason: '空卡渲染为空串，system 不加人设段',
       );
+    });
+
+    test('只有旧自由正文时原样使用（ADR-0010 数据兼容）', () {
+      const old = PersonaCard(
+        id: 'legacy',
+        name: '阿鱼',
+        text: '你是阿鱼，话少。',
+      );
+      expect(old.render(), '你是阿鱼，话少。');
+      expect(old.isEmpty, isFalse);
     });
 
     test('encodeList / decodeList 往返保真', () {

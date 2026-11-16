@@ -1,59 +1,77 @@
 import 'dart:convert';
 
-/// 人设卡（ADR-0009，2026-11-16 改为「单卡 + 自由正文」）。
+/// 人设卡（ADR-0009、ADR-0011）：一张、短、有口癖。
 ///
-/// 正文 [text] 是唯一的权威内容：非空就整段写进 system（借鉴
-/// dsh-persona-dafeiyu 的整段 markdown 做法，可放标题、例子、口癖）。
-/// 五要素字段只为兼容旧 settings.json 保留，正文为空时才拼成一句话。
+/// 只写「像人」需要的那几样：性格、说话方式、常用话、称呼。
+/// 每项几十字封顶——手机端小模型每轮都要重付这段 token，
+/// 写得越长首字出得越慢，指令也越容易糊。
 class PersonaCard {
   const PersonaCard({
     required this.id,
     required this.name,
-    this.text = '',
     this.personality = '',
     this.style = '',
+    this.catchphrase = '',
     this.addressTerm = '',
     this.boundary = '',
+    this.text = '',
   });
 
   final String id;
   final String name;
 
-  /// 人设正文（markdown 随意）：非空 = 整段注入，替代五要素。
-  final String text;
-
-  /// 旧版五要素（仅为读旧数据保留）。
+  /// 性格：几条形容词 + 一句「他大概是这样的人」。
   final String personality;
+
+  /// 说话方式：句子长短、语气、要不要列点。
   final String style;
+
+  /// 常用话 / 口癖：一两个短句，最出「人味」的那部分。
+  final String catchphrase;
+
+  /// 对用户的称呼，空则不指定。
   final String addressTerm;
+
+  /// 不做什么（可选）。
   final String boundary;
 
-  bool get isLegacy => text.trim().isEmpty;
+  /// 旧版自由正文：只用于读回 ADR-0010 那次改动存下的数据。
+  final String text;
 
   PersonaCard copyWith({
     String? name,
-    String? text,
     String? personality,
     String? style,
+    String? catchphrase,
     String? addressTerm,
     String? boundary,
+    String? text,
   }) => PersonaCard(
     id: id,
     name: name ?? this.name,
-    text: text ?? this.text,
     personality: personality ?? this.personality,
     style: style ?? this.style,
+    catchphrase: catchphrase ?? this.catchphrase,
     addressTerm: addressTerm ?? this.addressTerm,
     boundary: boundary ?? this.boundary,
+    text: text ?? this.text,
   );
+
+  /// 一项都没填（旧数据的自由正文也算有内容）。
+  bool get isEmpty =>
+      personality.isEmpty &&
+      style.isEmpty &&
+      catchphrase.isEmpty &&
+      addressTerm.isEmpty &&
+      boundary.isEmpty &&
+      text.isEmpty;
 
   Map<String, dynamic> toJson() => {
     'id': id,
     'name': name,
-    'text': text,
-    // 五要素照旧落盘：旧版本 App 读回时不至于丢内容。
     'personality': personality,
     'style': style,
+    'catchphrase': catchphrase,
     'addressTerm': addressTerm,
     'boundary': boundary,
   };
@@ -61,24 +79,27 @@ class PersonaCard {
   static PersonaCard fromJson(Map<String, dynamic> j) => PersonaCard(
     id: j['id'] as String,
     name: j['name'] as String? ?? '未命名',
-    text: j['text'] as String? ?? '',
     personality: j['personality'] as String? ?? '',
     style: j['style'] as String? ?? '',
+    catchphrase: j['catchphrase'] as String? ?? '',
     addressTerm: j['addressTerm'] as String? ?? '',
     boundary: j['boundary'] as String? ?? '',
+    text: j['text'] as String? ?? '',
   );
 
-  /// system 消息片段：正文优先，空正文回落五要素拼句（空卡返回空串）。
+  /// system 消息片段：有内容的字段才渲染，一句到底不加标题。
+  /// 旧数据只存了自由正文（ADR-0010）时，原样用那段。
   String render() {
-    final body = text.trim();
-    if (body.isNotEmpty) return body;
     final parts = <String>[
       if (personality.isNotEmpty) '性格：$personality',
-      if (style.isNotEmpty) '说话风格：$style',
+      if (style.isNotEmpty) '说话：$style',
+      if (catchphrase.isNotEmpty) '常说：「$catchphrase」',
       if (addressTerm.isNotEmpty) '称呼用户为「$addressTerm」',
-      if (boundary.isNotEmpty) '边界：$boundary',
+      if (boundary.isNotEmpty) '不做：$boundary',
     ];
     if (parts.isEmpty) {
+      final legacy = text.trim();
+      if (legacy.isNotEmpty) return legacy;
       return name.isEmpty ? '' : '你是$name。';
     }
     return '你是${name.isEmpty ? '聊天助手' : name}。${parts.join('。')}。';
@@ -102,32 +123,30 @@ class PersonaCard {
   }
 }
 
-/// 内置预设：写成短正文当「够短的样板」（手机端每轮都吃 system 预算）。
-/// 用户可整段改掉、也可照着结构扩写。
+/// 内置三段：短，且带口癖——口癖比形容词更像人。
 const List<PersonaCard> builtinPersonas = [
-  PersonaCard(
-    id: 'assistant',
-    name: '小助',
-    text: '你是小助，一个干活的助手。\n\n'
-        '- 语气平静自然，不寒暄、不卖萌。\n'
-        '- 能一句说清就别铺开；有步骤就分点列。\n'
-        '- 不确定就说不确定，缺信息就问，不编。',
-  ),
   PersonaCard(
     id: 'companion',
     name: '小暖',
-    text: '你是小暖，一个陪聊的朋友。\n\n'
-        '- 语气温和、口语化，像熟人说话。\n'
-        '- 回答短：一两句、十几二十个字，别写小作文。\n'
-        '- 记得他说过的事，顺手带进对话里。\n'
-        '- 不确定就说不确定，不编。',
+    personality: '温和、爱笑，先接住情绪，不急着给建议',
+    style: '口语，短句，一两句就停，不列点、不总结',
+    catchphrase: '嗯，我在；那你慢慢说',
+    addressTerm: '你',
+  ),
+  PersonaCard(
+    id: 'assistant',
+    name: '小助',
+    personality: '干脆、务实，不说客套话',
+    style: '先给结论，能一句就不写两句；要步骤才分点',
+    catchphrase: '行；这就来',
+    addressTerm: '你',
   ),
   PersonaCard(
     id: 'tutor',
     name: '阿博',
-    text: '你是阿博，负责把事讲明白的人。\n\n'
-        '- 先给结论，再讲为什么。\n'
-        '- 举生活里的例子，不堆术语。\n'
-        '- 不确定的地方明说，不编造。',
+    personality: '耐心、爱打比方，把事讲明白为乐',
+    style: '先结论再原因，多用生活里的例子，少术语',
+    catchphrase: '这么说吧；比如',
+    addressTerm: '你',
   ),
 ];

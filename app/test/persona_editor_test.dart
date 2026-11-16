@@ -7,8 +7,23 @@ import 'package:ragchat/app/persona.dart';
 import 'package:ragchat/app/persona_editor.dart';
 import 'package:ragchat/app/theme.dart';
 
-/// 人设编辑器：自由正文能存、预算表跟着字数走、空名字拦下、预设可一键填入。
+/// 人设编辑器：短字段能存、字数有上限、预算表跟着变、空名字拦下、预设可填。
 void main() {
+  const base = PersonaCard(
+    id: 'x',
+    name: '小暖',
+    personality: '温和',
+    style: '短句',
+    catchphrase: '嗯，我在',
+  );
+
+  /// 编辑器比默认 800×600 的测试屏长：撑高视口，免得下方分组没被构建。
+  void tallScreen(WidgetTester tester) {
+    tester.view.physicalSize = const Size(1200, 3200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+  }
+
   Widget host(void Function(BuildContext) onOpen) => MaterialApp(
     localizationsDelegates: const [DefaultCupertinoLocalizations.delegate],
     builder: (c, child) =>
@@ -23,45 +38,64 @@ void main() {
     ),
   );
 
-  testWidgets('改正文后保存，返回的卡正文变了、名字和 id 不变', (tester) async {
+  testWidgets('改口癖后保存，渲染出「常说」那句', (tester) async {
+    tallScreen(tester);
     PersonaCard? saved;
     await tester.pumpWidget(
       host(
-        (ctx) async => saved = await showPersonaEditor(
-          ctx,
-          initial: const PersonaCard(id: 'x', name: '小暖', text: '旧的'),
-        ),
+        (ctx) async => saved = await showPersonaEditor(ctx, initial: base),
       ),
     );
     await tester.tap(find.text('打开'));
     await tester.pumpAndSettle();
 
     await tester.enterText(
-      find.byKey(const ValueKey('persona-text')),
-      '你是阿鱼，话少，爱吃白饭。',
+      find.byKey(const ValueKey('persona-field-3')),
+      '那你慢慢说',
     );
     await tester.pump();
-    expect(find.textContaining('人设 ≈ 13 token'), findsOneWidget);
+    // 预览实时跟着走。
+    expect(find.textContaining('常说：「那你慢慢说」'), findsWidgets);
 
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
 
     expect(saved, isNotNull);
     expect(saved!.id, 'x');
-    expect(saved!.name, '小暖');
-    expect(saved!.render(), '你是阿鱼，话少，爱吃白饭。');
+    expect(saved!.catchphrase, '那你慢慢说');
+    expect(saved!.render(), contains('常说：「那你慢慢说」'));
+  });
+
+  testWidgets('字数有上限：性格最多 60 字', (tester) async {
+    tallScreen(tester);
+    PersonaCard? saved;
+    await tester.pumpWidget(
+      host(
+        (ctx) async => saved = await showPersonaEditor(ctx, initial: base),
+      ),
+    );
+    await tester.tap(find.text('打开'));
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byKey(const ValueKey('persona-field-1')),
+      'a' * 100,
+    );
+    await tester.pump();
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(saved!.personality.length, 60);
   });
 
   testWidgets('名字清空不能保存', (tester) async {
+    tallScreen(tester);
     PersonaCard? saved;
     var popped = false;
     await tester.pumpWidget(
       host(
         (ctx) async {
-          saved = await showPersonaEditor(
-            ctx,
-            initial: const PersonaCard(id: 'x', name: '小暖', text: '旧'),
-          );
+          saved = await showPersonaEditor(ctx, initial: base);
           popped = true;
         },
       ),
@@ -69,7 +103,7 @@ void main() {
     await tester.tap(find.text('打开'));
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.byKey(const ValueKey('persona-name')), '');
+    await tester.enterText(find.byKey(const ValueKey('persona-field-0')), '');
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
 
@@ -78,14 +112,12 @@ void main() {
     expect(find.text('先给它起个名字'), findsOneWidget);
   });
 
-  testWidgets('点预设把人设换成内置那段的正文', (tester) async {
+  testWidgets('点内置样板把人设换成那一段', (tester) async {
+    tallScreen(tester);
     PersonaCard? saved;
     await tester.pumpWidget(
       host(
-        (ctx) async => saved = await showPersonaEditor(
-          ctx,
-          initial: const PersonaCard(id: 'x', name: '小暖', text: '旧'),
-        ),
+        (ctx) async => saved = await showPersonaEditor(ctx, initial: base),
       ),
     );
     await tester.tap(find.text('打开'));
@@ -96,20 +128,19 @@ void main() {
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
 
-    expect(saved!.name, '阿博');
-    expect(saved!.render(), builtinPersonas.last.text);
+    final tutor = builtinPersonas.firstWhere((c) => c.id == 'tutor');
+    expect(saved!.name, tutor.name);
+    expect(saved!.render(), tutor.render());
   });
 
   testWidgets('取消不返回任何卡', (tester) async {
-    PersonaCard? saved;
+    tallScreen(tester);
     var popped = false;
+    PersonaCard? saved;
     await tester.pumpWidget(
       host(
         (ctx) async {
-          saved = await showPersonaEditor(
-            ctx,
-            initial: const PersonaCard(id: 'x', name: '小暖', text: '旧'),
-          );
+          saved = await showPersonaEditor(ctx, initial: base);
           popped = true;
         },
       ),

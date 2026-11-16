@@ -1,5 +1,6 @@
 // ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../rag/token_budget.dart';
@@ -7,7 +8,7 @@ import 'ios_widgets.dart';
 import 'persona.dart';
 import 'theme.dart';
 
-/// 人设编辑器（全屏页）：名字 + 一大块自由正文 + system 预算表。
+/// 人设编辑器（全屏页）：六个短字段 + 实时 system 预览 + 预算表。
 /// 返回 null = 取消；否则返回改好的卡。
 Future<PersonaCard?> showPersonaEditor(
   BuildContext context, {
@@ -21,15 +22,27 @@ Future<PersonaCard?> showPersonaEditor(
   );
 }
 
-/// 结构模板：给「不知道怎么写」的人一个骨架，删掉不要的段落即可。
-const String _template = '你是{{名字}}，一个……\n\n'
-    '## 你是谁\n\n'
-    '- 身份、性格两三条就够，别写成小说。\n\n'
-    '## 怎么说话\n\n'
-    '- 句子多长、语气、口头禅、要不要用表情。\n'
-    '- 举个「用户说 X → 你答 Y」的短例子最省字。\n\n'
-    '## 不做什么\n\n'
-    '- 越界的事、编造、长篇说教。';
+/// 人设软上限：超过它就开始挤记忆，界面标红。
+const int personaSoftBudgetTokens = 240;
+
+/// 每项的输入上限（字）：字数就是 token，卡在能写清楚的程度。
+class _Field {
+  const _Field(this.label, this.hint, this.maxChars, this.maxLines);
+
+  final String label;
+  final String hint;
+  final int maxChars;
+  final int maxLines;
+}
+
+const _fields = <_Field>[
+  _Field('名字', '如：小暖', 10, 1),
+  _Field('性格', '如：温和、爱笑，先接住情绪，不急着给建议', 60, 3),
+  _Field('说话方式', '如：口语，短句，一两句就停，不列点', 80, 3),
+  _Field('常用的话', '如：嗯，我在；那你慢慢说 —— 口癖比形容词更像人', 40, 2),
+  _Field('称呼', '如：你 / Danny；留空则不指定', 10, 1),
+  _Field('不做的事', '如：不给医疗建议（可留空）', 60, 2),
+];
 
 class PersonaEditorPage extends StatefulWidget {
   const PersonaEditorPage({super.key, required this.initial});
@@ -42,29 +55,43 @@ class PersonaEditorPage extends StatefulWidget {
 
 class _PersonaEditorPageState extends State<PersonaEditorPage> {
   late final PersonaCard _base = widget.initial;
-  late final _name = TextEditingController(text: _base.name);
-  late final _text = TextEditingController(text: _base.render());
+  late final List<TextEditingController> _ctrls = [
+    TextEditingController(text: _base.name),
+    TextEditingController(text: _base.personality),
+    TextEditingController(text: _base.style),
+    TextEditingController(text: _base.catchphrase),
+    TextEditingController(text: _base.addressTerm),
+    TextEditingController(text: _base.boundary),
+  ];
 
   @override
   void initState() {
     super.initState();
-    _name.addListener(_onChanged);
-    _text.addListener(_onChanged);
+    for (final c in _ctrls) {
+      c.addListener(_onChanged);
+    }
   }
 
   @override
   void dispose() {
-    _name.dispose();
-    _text.dispose();
+    for (final c in _ctrls) {
+      c.dispose();
+    }
     super.dispose();
   }
 
   void _onChanged() => setState(() {});
 
+  String _v(int i) => _ctrls[i].text.trim();
+
   PersonaCard get _draft => PersonaCard(
     id: _base.id,
-    name: _name.text.trim(),
-    text: _text.text.trim(),
+    name: _v(0),
+    personality: _v(1),
+    style: _v(2),
+    catchphrase: _v(3),
+    addressTerm: _v(4),
+    boundary: _v(5),
   );
 
   void _save() {
@@ -77,13 +104,13 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
     Navigator.of(context).pop(_draft);
   }
 
-  void _useTemplate() {
-    _text.text = _template.replaceFirst('{{名字}}', _name.text.trim());
-  }
-
   void _useBuiltin(PersonaCard card) {
-    _name.text = card.name;
-    _text.text = card.text;
+    _ctrls[0].text = card.name;
+    _ctrls[1].text = card.personality;
+    _ctrls[2].text = card.style;
+    _ctrls[3].text = card.catchphrase;
+    _ctrls[4].text = card.addressTerm;
+    _ctrls[5].text = card.boundary;
   }
 
   @override
@@ -113,52 +140,36 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
         padding: const EdgeInsets.only(top: 16, bottom: 32),
         children: [
           IosSection(
-            header: '名字',
-            child: CupertinoTextField(
-              key: const ValueKey('persona-name'),
-              controller: _name,
-              placeholder: '如：小暖',
-              clearButtonMode: OverlayVisibilityMode.editing,
-              style: TextStyle(fontSize: kFontBody),
-            ),
-          ),
-          const SizedBox(height: 16),
-          IosSection(
-            header: '人设正文',
-            footer: '整段写进 system（markdown 随便用）。写在 system 里的每个字，每轮对话都要重新付一次 token。',
-            child: CupertinoTextField(
-              key: const ValueKey('persona-text'),
-              controller: _text,
-              placeholder: '你是谁、怎么说话、不做什么……',
-              minLines: 8,
-              maxLines: 14,
-              style: TextStyle(fontSize: kFontBody),
+            header: '人设卡',
+            footer: '写得越短，手机端首字出得越快。形容词两三个就够，口癖比形容词更像人。',
+            child: Column(
+              children: [
+                for (var i = 0; i < _fields.length; i++) ...[
+                  if (i > 0) const Divider(height: 20),
+                  _field(i, secondary),
+                ],
+              ],
             ),
           ),
           const SizedBox(height: 16),
           _budgetSection(used, secondary),
           const SizedBox(height: 16),
           IosSection(
-            header: '省事的起点',
-            footer: '内置三段都是「够短」的样板；模板是骨架，改完记得删掉多余的话。',
+            header: '写入 system 的原文',
+            footer: '下一轮对话生效，不用重载模型。',
+            child: Text(
+              _draft.render().isEmpty ? '（空）' : _draft.render(),
+              style: TextStyle(fontSize: kFontBody, color: secondary),
+            ),
+          ),
+          const SizedBox(height: 16),
+          IosSection(
+            header: '内置样板',
+            footer: '三个人设的写法差别在口癖：换一张，语气就不一样。',
             child: Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
-                CupertinoButton(
-                  key: const ValueKey('persona-template'),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  minimumSize: Size.zero,
-                  color: CupertinoColors.tertiarySystemFill.resolveFrom(context),
-                  onPressed: _useTemplate,
-                  child: Text(
-                    '结构模板',
-                    style: TextStyle(fontSize: kFontCaption),
-                  ),
-                ),
                 for (final b in builtinPersonas)
                   CupertinoButton(
                     key: ValueKey('persona-preset-${b.id}'),
@@ -184,35 +195,64 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
     );
   }
 
-  /// system 预算表：人设越长，长期记忆能被塞进去的越少。
+  Widget _field(int i, Color secondary) {
+    final f = _fields[i];
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(
+              f.label,
+              style: TextStyle(fontSize: kFontCaption, color: secondary),
+            ),
+            const Spacer(),
+            Text(
+              '${_ctrls[i].text.trim().length}/${f.maxChars}',
+              style: TextStyle(fontSize: kFontCaption, color: secondary),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        CupertinoTextField(
+          key: ValueKey('persona-field-$i'),
+          controller: _ctrls[i],
+          placeholder: f.hint,
+          maxLines: f.maxLines,
+          minLines: 1,
+          inputFormatters: [LengthLimitingTextInputFormatter(f.maxChars)],
+          style: TextStyle(fontSize: kFontBody),
+          clearButtonMode: OverlayVisibilityMode.editing,
+        ),
+      ],
+    );
+  }
+
+  /// 预算表：system 共 800，人设超过软上限就开始挤记忆。
   Widget _budgetSection(int used, Color secondary) {
-    const budget = systemBudgetTokens;
-    final ratio = (used / budget).clamp(0.0, 1.0).toDouble();
-    final over = used > budget * 0.75;
+    final ratio = (used / personaSoftBudgetTokens).clamp(0.0, 1.0).toDouble();
+    final over = used > personaSoftBudgetTokens;
     final barColor = over
         ? CupertinoColors.systemRed.resolveFrom(context)
         : CupertinoTheme.of(context).primaryColor;
-    final left = budget - used;
+    final left = personaSoftBudgetTokens - used;
     return IosSection(
       header: 'system 预算',
       footer: over
-          ? '人设已经吃掉大半预算：记忆条目会被砍，回答也更容易「只记得人设、不记得你」。'
-          : '人设与长期记忆共用这 800 token；想留更多记忆空间，就再删点话。',
+          ? '超过软上限了：system 一共 800 token，人设占得多，长期记忆就挤不进去。'
+          : 'system 一共 800 token，人设建议 ≤$personaSoftBudgetTokens，剩下留给长期记忆。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Text(
-                '人设 ≈ $used token',
-                style: TextStyle(fontSize: kFontBody),
-              ),
+              Text('人设 ≈ $used token', style: TextStyle(fontSize: kFontBody)),
               const Spacer(),
               Text(
-                left >= 0 ? '记忆剩 ≈ $left' : '超出 ${-left}',
+                left >= 0 ? '建议余量 $left' : '超出 ${-left}',
                 style: TextStyle(
                   fontSize: kFontCaption,
-                  color: left >= 0 ? secondary : barColor,
+                  color: over ? barColor : secondary,
                 ),
               ),
             ],

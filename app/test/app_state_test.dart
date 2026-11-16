@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:ragchat/app/app_state.dart';
-import 'package:ragchat/app/persona.dart';
 import 'package:ragchat/app/settings.dart';
 import 'package:ragchat/chat/chat_service.dart';
 import 'package:ragchat/rag/model_gateway.dart';
@@ -72,20 +71,22 @@ void main() {
     expect(base.name, '小助', reason: '默认内置第一张');
 
     await state.savePersona(
-      base.copyWith(name: '阿鱼', text: '你是阿鱼，话少。'),
+      base.copyWith(name: '阿鱼', personality: '话少，爱吃白饭'),
     );
     expect(state.activePersonaCard().name, '阿鱼');
-    expect(state.systemPrompt(), contains('你是阿鱼，话少。'));
+    expect(state.systemPrompt(), contains('你是阿鱼'));
+    expect(state.systemPrompt(), contains('性格：话少，爱吃白饭'));
 
     // 落盘只有一张，正文就是刚写的那段。
     final reloaded = await AppSettings.load(dir.path);
     expect(reloaded.personas().length, 1);
     expect(reloaded.personas().single.name, '阿鱼');
-    expect(reloaded.personas().single.text, '你是阿鱼，话少。');
+    expect(reloaded.personas().single.personality, '话少，爱吃白饭');
     expect(reloaded.activePersonaId, base.id);
 
     await state.resetPersona();
-    expect(state.activePersonaCard().text, builtinPersonas.first.text);
+    expect(state.activePersonaCard().name, '小助');
+    expect(state.activePersonaCard().catchphrase, '行；这就来');
   });
 }
 
