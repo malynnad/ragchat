@@ -1,0 +1,12 @@
+.DS_Store
+*.iml
+
+# Flutter / Dart
+app/.dart_tool/
+app/.flutter-plugins-dependencies
+app/build/
+app/android/app/debug
+app/android/app/profile
+app/android/app/release
+app/ios/Flutter/.last_build_id
+app/.idea/

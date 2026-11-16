@@ -1,0 +1,479 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/widgets.dart';
+import 'package:material_ui/material_ui.dart' show ThemeMode;
+import 'package:nobodywho/nobodywho.dart' as nw;
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+
+import '../chat/app_db.dart';
+import '../chat/chat_service.dart';
+import '../chat/memory_service.dart';
+import '../rag/models.dart';
+import '../rag/nobodywho_gateway.dart';
+import '../rag/token_budget.dart';
+import 'persona.dart';
+import 'settings.dart';
+import 'theme.dart';
+
+class ModelFile {
+  ModelFile(this.path, this.size);
+  final String path;
+  final int size;
+  String get name => p.basename(path);
+}
+
+/// App 控制器：设置、模型准备、聊天会话、记忆管理的唯一状态源。
+/// UI 经 AppStateScope 监听；ChatService 接缝保持可测试。
+class AppState extends ChangeNotifier {
+  AppSettings settings = AppSettings();
+  String modelsDirPath = '';
+  final modelFiles = <ModelFile>[];
+  String loadStage = '';
+  String? loadError;
+  double? downloadProgress;
+  String? downloadLabel;
+
+  /// 正在下载的候选目录 URL（圆环进度）：供设置页定位"哪一行"显示圆环。
+  /// 下载开始即置、结束清空；null 表示当前无下载。
+  String? downloadingUrl;
+
+  /// mac 外壳遗留的动作总线（保留接缝）：递增计数即触发一次新对话。
+  final newConversationBus = ValueNotifier<int>(0);
+
+  /// 主题模式（不持久化，重启回跟随系统）。
+  ThemeMode themeMode = ThemeMode.system;
+  void setThemeMode(ThemeMode mode) {
+    themeMode = mode;
+    notifyListeners();
+  }
+
+  String _supportDir = '';
+  AppDb? _db;
+  NobodyWhoGateway? _gateway;
+  ChatService? _chatService;
+
+  /// 当前会话（US-19 持久化）：重启恢复最近会话与轮次。
+  String? currentSessionId;
+  final sessionTurns = <SessionTurn>[];
+
+  /// 记忆条目（US-21 记忆页数据源）：含停用，activeMemories 语义由调用方过滤。
+  List<MemoryEntry> memories = [];
+
+  /// US-1 下载源：hf-mirror（国内可达，已 HEAD 验证）；nobodywho 内置下载器。
+  /// ADR-0009：陪聊默认 Qwen3.5-2B 速度档，优先低延迟与低内存占用。
+  static const chatModelUrl =
+      'https://hf-mirror.com/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf';
+
+  /// 嵌入模型可选（MVP 不强制，US-24）；仅 v2 情景记忆需要。
+  static const embedModelUrl =
+      'https://hf-mirror.com/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf';
+
+  bool get modelsReady =>
+      settings.chatModelPath != null &&
+      File(settings.chatModelPath!).existsSync();
+
+  /// 首启必经模型准备页（US-1）；确认后直达主页。
+  bool get entered => settings.confirmed && modelsReady;
+
+  bool get gatewayLoaded => _gateway?.loaded ?? false;
+
+  Future<void> init() async {
+    _supportDir = (await getApplicationSupportDirectory()).path;
+    settings = await AppSettings.load(_supportDir);
+    _db = await AppDb.openFile(p.join(_supportDir, 'rag.db'));
+    final ext = await getExternalStorageDirectory();
+    modelsDirPath = p.join(ext!.path, 'models');
+    await rescanModels();
+    settings.chatModelPath ??= _autoAssignChat();
+    await restoreLatestSession();
+    await loadMemories();
+    notifyListeners();
+  }
+
+  /// 文件名启发式预选生成角色：排除 embed 命名后的最大文件。
+  String? _autoAssignChat() {
+    return modelFiles
+        .where((f) => !f.name.toLowerCase().contains('embed'))
+        .fold<ModelFile?>(
+          null,
+          (big, f) => big == null || f.size > big.size ? f : big,
+        )
+        ?.path;
+  }
+
+  /// 重启恢复：最近会话 + 其轮次（US-19）。
+  Future<void> restoreLatestSession() async {
+    final db = _db!;
+    final latest = await db.latestSession();
+    if (latest == null) return;
+    currentSessionId = latest.id;
+    sessionTurns
+      ..clear()
+      ..addAll(await db.sessionTurns(latest.id));
+  }
+
+  // ---- 记忆（US-21）----
+
+  Future<void> loadMemories() async {
+    memories = await _db!.allMemories();
+    notifyListeners();
+  }
+
+  /// active 记忆按注入序（importance 降序、同分按更新时间新者在前）。
+  List<MemoryEntry> activeMemories() =>
+      memories.where((m) => m.active).toList();
+
+  Future<void> editMemory(MemoryEntry entry) async {
+    await _db!.upsertMemory(entry);
+    await loadMemories();
+  }
+
+  Future<void> deleteMemory(String id) async {
+    await _db!.deleteMemory(id);
+    await loadMemories();
+  }
+
+  Future<void> deactivateMemory(String id) async {
+    await _db!.deactivateMemory(id);
+    await loadMemories();
+  }
+
+  /// 手动提取（记忆页按钮）：对当前会话跑一次提取管线（US-21）。
+  Future<int> extractMemoriesManually() async {
+    final sid = currentSessionId;
+    if (sid == null || sessionTurns.isEmpty) return 0;
+    return _runExtraction(sessionTurns.toList(), sessionId: sid);
+  }
+
+  Future<int> _runExtraction(
+    List<SessionTurn> turns, {
+    String? sessionId,
+  }) async {
+    final chat = await ensureChat();
+    final service = MemoryService(_db!, chat.gateway);
+    final n = await service.extractFromTurns(turns, sessionId: sessionId);
+    if (n > 0) await loadMemories();
+    return n;
+  }
+
+  // ---- 人设卡（US-22）----
+
+  /// 当前激活的人设卡。
+  PersonaCard activePersonaCard() =>
+      settings.activePersona(settings.personas());
+
+  /// 切换激活卡。
+  Future<void> switchPersona(String id) async {
+    settings.activePersonaId = id;
+    await settings.save(_supportDir);
+    notifyListeners();
+  }
+
+  /// 全量保存人设卡列表（增删改后调用）。
+  Future<void> savePersonas(List<PersonaCard> cards) async {
+    settings.personasJson = PersonaCard.encodeList(cards);
+    // 激活卡被删时回退第一张。
+    if (!cards.any((c) => c.id == settings.activePersonaId)) {
+      settings.activePersonaId = cards.firstOrNull?.id ?? 'assistant';
+    }
+    await settings.save(_supportDir);
+    notifyListeners();
+  }
+
+  /// system 消息文本：人设卡 + 核心记忆（预算内截断），每轮重建。
+  String systemPrompt() => ChatService.buildSystemPromptWithinBudget(
+    activePersonaCard(),
+    activeMemories(),
+  );
+
+  /// 会话预算占用率（UI 指示器用）：无 service 时纯估算兜底。
+  double contextUsage() {
+    final service = _chatService;
+    if (service != null) return service.contextUsage(sessionTurns);
+    return sessionUsageEstimate(sessionTurns);
+  }
+
+  /// 当前主题色档位：供 main.dart 注入四个 theme builder。
+  AccentChoice get accent => accentById(settings.accentId);
+
+  /// 切换主题色：先 notify 全 App 即时换色，再异步落盘持久化。
+  Future<void> updateAccent(String id) async {
+    settings.accentId = id;
+    notifyListeners();
+    await settings.save(_supportDir);
+  }
+
+  /// 扫描手动导入目录 + nobodywho 下载缓存（US-1 两条来源）。
+  Future<void> rescanModels() async {
+    final found = <String, int>{};
+    final dir = Directory(modelsDirPath);
+    if (dir.existsSync()) {
+      for (final f in dir.listSync()) {
+        if (f is File && f.path.endsWith('.gguf')) {
+          found[f.path] = f.lengthSync();
+        }
+      }
+    }
+    for (final (path, size) in nw.getCachedModels()) {
+      found[path] = size.toInt();
+    }
+    modelFiles
+      ..clear()
+      ..addAll(found.entries.map((e) => ModelFile(e.key, e.value)));
+    modelFiles.sort((a, b) => a.name.compareTo(b.name));
+    notifyListeners();
+  }
+
+  /// 按文件名启发式筛选模型角色：含 embed → 嵌入，其余 → 聊天。
+  List<ModelFile> filesForRole({required bool isChat}) {
+    return modelFiles.where((f) {
+      final isEmbed = f.name.toLowerCase().contains('embed');
+      return isChat ? !isEmbed : isEmbed;
+    }).toList();
+  }
+
+  Future<void> confirmModels() async {
+    settings.confirmed = true;
+    await settings.save(_supportDir);
+    notifyListeners();
+  }
+
+  /// 模型准备页角色指派（US-1）。嵌入模型可选，null 表示跳过。
+  void assignModel({required bool isChat, required String? path}) {
+    if (isChat) {
+      settings.chatModelPath = path;
+    } else {
+      settings.embedModelPath = path;
+    }
+    notifyListeners();
+  }
+
+  /// US-1：内置下载（带进度回调；nobodywho 不支持续传，失败可重试）。
+  Future<void> downloadModel({required bool isChat, String? url}) async {
+    final target = url ?? (isChat ? chatModelUrl : embedModelUrl);
+    downloadLabel = isChat ? '下载聊天模型…' : '下载嵌入模型…';
+    downloadProgress = 0;
+    downloadingUrl = target;
+    notifyListeners();
+    try {
+      final path = await nw.downloadModel(
+        modelPath: target,
+        onDownloadProgress: (done, total) {
+          downloadProgress = total > 0 ? done / total : 0;
+          notifyListeners();
+        },
+      );
+      if (isChat) {
+        settings.chatModelPath = path;
+      } else {
+        settings.embedModelPath = path;
+      }
+      await settings.save(_supportDir);
+      await rescanModels();
+      // 已进入主页时下载即切换：重载模型使新模型生效。
+      if (settings.confirmed) await reloadModels();
+    } finally {
+      downloadProgress = null;
+      downloadLabel = null;
+      downloadingUrl = null;
+      notifyListeners();
+    }
+  }
+
+  /// 删除已下载模型。安全闸：活跃生成/嵌入模型与下载中文件禁删。
+  /// 返回 null 表示成功；否则返回拒绝原因（供 UI snackbar）。
+  Future<String?> deleteModel(String path) async {
+    if (path == settings.chatModelPath || path == settings.embedModelPath) {
+      return '该模型正在使用，请先切换后再删除';
+    }
+    if (downloadingUrl != null) {
+      return '下载进行中，暂不能删除模型';
+    }
+    final f = File(path);
+    if (!f.existsSync()) return '文件不存在（可能已被移除）';
+    await f.delete();
+    modelFiles.removeWhere((e) => e.path == path);
+    notifyListeners();
+    return null;
+  }
+
+  /// 设置页切换本地模型：保存 + 重载。
+  Future<void> switchModel({required bool isChat, required String path}) async {
+    if (isChat) {
+      settings.chatModelPath = path;
+    } else {
+      settings.embedModelPath = path;
+    }
+    await settings.save(_supportDir);
+    await reloadModels();
+    notifyListeners();
+  }
+
+  /// US-1 手动导入兜底：SAF 选文件 → 流式拷贝进模型目录（带进度）。
+  Future<void> importModelFile(PlatformFile file) async {
+    Directory(modelsDirPath).createSync(recursive: true);
+    final out = File(p.join(modelsDirPath, file.name));
+    final sink = out.openWrite();
+    final total = file.lengthSync() ?? 0;
+    var done = 0;
+    downloadLabel = '导入 ${file.name}…';
+    downloadProgress = 0;
+    notifyListeners();
+    try {
+      await for (final chunk in file.readAsByteStream()) {
+        sink.add(chunk);
+        done += chunk.length;
+        downloadProgress = total > 0 ? done / total : 0;
+        notifyListeners();
+      }
+      await sink.close();
+    } catch (e) {
+      await sink.close();
+      // 清掉半截文件，避免扫描把残文件当模型候选
+      if (out.existsSync()) out.deleteSync();
+      rethrow;
+    } finally {
+      downloadProgress = null;
+      downloadLabel = null;
+    }
+    await rescanModels();
+    if (file.name.toLowerCase().contains('embed')) {
+      settings.embedModelPath ??= out.path;
+    } else {
+      settings.chatModelPath ??= out.path;
+    }
+    notifyListeners();
+  }
+
+  /// 测试接缝（主机 widget 测试）：注入 ChatService 工厂，绕开 native 模型加载。
+  /// 生产恒为 null；注入后 stopGeneration/resetSession 照常走 _chatService。
+  @visibleForTesting
+  Future<ChatService> Function()? debugServiceFactory;
+
+  /// widget 测试注入 AppDb（真机走 init() 开文件库）。
+  @visibleForTesting
+  set debugDb(AppDb db) => _db = db;
+
+  /// widget 测试注入设置落盘目录（真机走 init() 取应用支持目录）。
+  @visibleForTesting
+  set debugSupportDir(String dir) => _supportDir = dir;
+
+  /// 懒建 Gateway + ChatService（ADR-0009：嵌入模型可选）。
+  Future<ChatService> ensureChat() async {
+    if (_chatService != null) return _chatService!;
+    if (debugServiceFactory != null) {
+      _chatService = await debugServiceFactory!();
+      return _chatService!;
+    }
+    final gateway = NobodyWhoGateway(
+      chatModelPath: settings.chatModelPath!,
+      embedModelPath: settings.embedModelPath,
+      useGpu: settings.useGpu,
+      onLoadProgress: (stage) {
+        loadStage = stage;
+        notifyListeners();
+      },
+    );
+    _gateway = gateway;
+    _chatService = ChatService(gateway: gateway);
+    return _chatService!;
+  }
+
+  /// 进主页时预热模型（真机）。
+  Future<void> warmUp() async {
+    if (gatewayLoaded) return;
+    loadError = null;
+    notifyListeners();
+    try {
+      await ensureChat();
+      await _gateway?.ensureLoaded();
+      loadStage = '';
+    } catch (e) {
+      loadStage = '';
+      loadError = e.toString();
+    }
+    notifyListeners();
+  }
+
+  Future<void> reloadModels() async {
+    // 先停生成再释放：避免流式迭代中 Rust 侧模型被回收
+    _chatService?.stopGeneration();
+    await _gateway?.dispose();
+    _gateway = null;
+    _chatService = null;
+    await warmUp();
+  }
+
+  /// US-9：停止生成。
+  void stopGeneration() => _chatService?.stopGeneration();
+
+  /// 完成一轮：写盘 + 内存列表（US-19）。由聊天页在 AnswerDone 后调用。
+  Future<void> persistTurn(String question, String answer) async {
+    final db = _db;
+    if (db == null) return;
+    // 无会话时惰性创建（首启恢复失败或测试注入空库）。
+    currentSessionId ??= (await db.createSession()).id;
+    sessionTurns.add(SessionTurn(question: question, answer: answer));
+    await db.appendTurn(currentSessionId!, sessionTurns.last);
+    notifyListeners();
+  }
+
+  /// ADR-0009：新对话——先对当前会话跑记忆提取（异步，完成后刷新记忆页），
+  /// 再开新 session、清空会话、重置模型侧上下文。
+  Future<void> startNewConversation() async {
+    final turns = sessionTurns.toList();
+    final sid = currentSessionId;
+    sessionTurns.clear();
+    currentSessionId = (await _db?.createSession())?.id;
+    await _chatService?.resetSession();
+    notifyListeners();
+    // 提取放后台：不阻塞新一轮聊天；完成后 loadMemories 会 notify。
+    if (turns.isNotEmpty) {
+      unawaited(
+        _runExtraction(turns, sessionId: sid).catchError((Object _) => 0),
+      );
+    }
+  }
+
+  /// 后端切换（ADR-0005）：需重新加载模型。
+  Future<void> updateUseGpu(bool value) async {
+    settings.useGpu = value;
+    await settings.save(_supportDir);
+    await reloadModels();
+  }
+
+  /// 清空数据：会话历史 + 记忆（存储统计入口用）。
+  Future<void> clearAllData() async {
+    await _db?.deleteAllSessions();
+    for (final m in memories) {
+      await _db!.deleteMemory(m.id);
+    }
+    sessionTurns.clear();
+    currentSessionId = null;
+    await loadMemories();
+  }
+
+  /// 存储占用（会话/记忆 DB + 模型文件）。
+  ({int dbBytes, int modelBytes}) storageStats() {
+    final db = File(p.join(_supportDir, 'rag.db'));
+    return (
+      dbBytes: db.existsSync() ? db.lengthSync() : 0,
+      modelBytes: modelFiles.fold(0, (sum, f) => sum + f.size),
+    );
+  }
+}
+
+/// InheritedNotifier 注入：页面经 AppStateScope.of(context) 监听控制器。
+class AppStateScope extends InheritedNotifier<AppState> {
+  const AppStateScope({
+    super.key,
+    required AppState state,
+    required super.child,
+  }) : super(notifier: state);
+
+  static AppState of(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AppStateScope>()!.notifier!;
+}

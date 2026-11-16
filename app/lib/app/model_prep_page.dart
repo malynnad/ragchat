@@ -1,0 +1,320 @@
+// ignore: deprecated_member_use
+import 'package:flutter/cupertino.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:material_ui/material_ui.dart';
+
+import 'app_state.dart';
+import 'ios_dialogs.dart';
+import 'ios_widgets.dart';
+import 'theme.dart';
+
+/// US-1 模型准备页：首启必经。下载（hf-mirror + 进度）或手动导入兜底，
+/// 角色指派确认后进入聊天主页。iOS 风格。
+class ModelPrepPage extends StatelessWidget {
+  const ModelPrepPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppStateScope.of(context);
+    final cup = CupertinoTheme.of(context);
+    final chatPaths = state
+        .filesForRole(isChat: true)
+        .map((f) => f.path)
+        .toList();
+    final embedPaths = state
+        .filesForRole(isChat: false)
+        .map((f) => f.path)
+        .toList();
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final label = CupertinoColors.label.resolveFrom(context);
+    return Scaffold(
+      backgroundColor: cup.scaffoldBackgroundColor,
+      appBar: CupertinoNavigationBar(middle: const Text('模型准备'), border: null),
+      body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              '陪聊只需聊天模型。嵌入模型可选，仅用于后续情景记忆；'
+              '准备完成后聊天与记忆全程离线。',
+              style: TextStyle(fontSize: kFontBody, color: secondary),
+            ),
+          ),
+          const SizedBox(height: 16),
+          _roleCard(context, state, isChat: true, paths: chatPaths),
+          const SizedBox(height: 16),
+          _roleCard(context, state, isChat: false, paths: embedPaths),
+          if (state.downloadLabel != null) ...[
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    state.downloadLabel!,
+                    style: TextStyle(fontSize: kFontBody, color: label),
+                  ),
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(3),
+                    child: LinearProgressIndicator(
+                      value: state.downloadProgress,
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          const SizedBox(height: 16),
+          _UsbDisclosure(modelsDirPath: state.modelsDirPath),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: CupertinoButton(
+                onPressed: state.rescanModels,
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.refresh, size: 18),
+                    SizedBox(width: 4),
+                    Text('重新扫描'),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: SizedBox(
+            width: double.infinity,
+            child: CupertinoButton.filled(
+              onPressed: state.modelsReady ? state.confirmModels : null,
+              child: Text(
+                '保存并开始聊天',
+                style: TextStyle(
+                  color: onAccent(CupertinoTheme.of(context).primaryColor),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _roleCard(
+    BuildContext context,
+    AppState state, {
+    required bool isChat,
+    required List<String> paths,
+  }) {
+    final current = isChat
+        ? state.settings.chatModelPath
+        : state.settings.embedModelPath;
+    final file = state.modelFiles
+        .where((f) => f.path == current)
+        .map((f) => f.size)
+        .firstOrNull;
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final busy = state.downloadProgress != null;
+    return IosSection(
+      header: isChat ? '聊天模型' : '嵌入模型（可选）',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            isChat ? '推荐 Qwen3.5-2B Q4_K_M（聊天速度优先）' : '可选；仅 v2 情景记忆需要',
+            style: TextStyle(fontSize: kFontCaption, color: secondary),
+          ),
+          const SizedBox(height: 8),
+          _rolePicker(context, state, isChat: isChat, paths: paths),
+          if (file != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '${(file / 1e9).toStringAsFixed(2)} GB',
+                style: TextStyle(fontSize: kFontCaption, color: secondary),
+              ),
+            ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                minimumSize: Size.zero,
+                onPressed: busy
+                    ? null
+                    : () => _download(context, state, isChat),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.cloud_download, size: 18),
+                    SizedBox(width: 4),
+                    Text('下载', style: TextStyle(fontSize: kFontBody)),
+                  ],
+                ),
+              ),
+              CupertinoButton(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                minimumSize: Size.zero,
+                onPressed: busy ? null : () => _import(context, state),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.folder_open, size: 18),
+                    SizedBox(width: 4),
+                    Text('导入本地文件', style: TextStyle(fontSize: kFontBody)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rolePicker(
+    BuildContext context,
+    AppState state, {
+    required bool isChat,
+    required List<String> paths,
+  }) {
+    final current = isChat
+        ? state.settings.chatModelPath
+        : state.settings.embedModelPath;
+    final label = CupertinoColors.label.resolveFrom(context);
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    return CupertinoButton(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      onPressed: () async {
+        if (paths.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isChat ? '未找到可用的聊天模型，请先下载或导入' : '未找到可用的嵌入模型，请先下载或导入',
+              ),
+            ),
+          );
+          return;
+        }
+        final v = await showIosActionSheet<String>(
+          context: context,
+          title: isChat ? '选择聊天模型' : '选择嵌入模型',
+          actions: [
+            for (final path in paths) IosAction(path.split('/').last, path),
+          ],
+        );
+        if (v != null) state.assignModel(isChat: isChat, path: v);
+      },
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              current == null ? '选择 GGUF 文件' : current.split('/').last,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: kFontBody, color: label),
+            ),
+          ),
+          Icon(CupertinoIcons.chevron_right, size: 18, color: secondary),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _download(
+    BuildContext context,
+    AppState state,
+    bool isChat,
+  ) async {
+    try {
+      await state.downloadModel(isChat: isChat);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('下载失败（可重试或手动导入）: $e')));
+      }
+    }
+  }
+
+  Future<void> _import(BuildContext context, AppState state) async {
+    try {
+      final files = await FilePicker.pickFiles(type: FileType.any);
+      final file = files.firstOrNull;
+      if (file == null) return;
+      await state.importModelFile(file);
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('导入失败: $e')));
+      }
+    }
+  }
+}
+
+/// USB 手动导入说明（可折叠）。
+class _UsbDisclosure extends StatefulWidget {
+  const _UsbDisclosure({required this.modelsDirPath});
+
+  final String modelsDirPath;
+
+  @override
+  State<_UsbDisclosure> createState() => _UsbDisclosureState();
+}
+
+class _UsbDisclosureState extends State<_UsbDisclosure> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = CupertinoColors.label.resolveFrom(context);
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    return IosSection(
+      contentPadding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          CupertinoButton(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            onPressed: () => setState(() => _expanded = !_expanded),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'USB 手动导入说明（国内网络兜底）',
+                    style: TextStyle(fontSize: kFontBody, color: label),
+                  ),
+                ),
+                Icon(
+                  _expanded
+                      ? CupertinoIcons.chevron_up
+                      : CupertinoIcons.chevron_down,
+                  size: 18,
+                  color: secondary,
+                ),
+              ],
+            ),
+          ),
+          if (_expanded)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: SelectableText(
+                '电脑 adb push GGUF 到以下目录，或在上方用「导入本地文件」'
+                '从手机存储选择：\n${widget.modelsDirPath}\n\n'
+                '示例：\nadb push Qwen3.5-2B-Q4_K_M.gguf ${widget.modelsDirPath}/\n'
+                'push 完成后回到本页点「重新扫描」。',
+                style: TextStyle(fontSize: kFontCaption, color: secondary),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
