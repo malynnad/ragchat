@@ -76,7 +76,7 @@ class _SplashGateState extends State<SplashGate>
             child: Transform.scale(
               scale: scale.value,
               child: Image.asset(
-                'assets/branding/whale-512.png',
+                'assets/branding/whale-splash.png',
                 width: 168,
                 height: 168,
                 filterQuality: FilterQuality.medium,
