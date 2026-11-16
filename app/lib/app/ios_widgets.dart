@@ -56,11 +56,7 @@ class IosSection extends StatelessWidget {
             ),
             const SizedBox(height: 8),
           ],
-          ContentPanel(
-            padding: contentPadding,
-            registration: false,
-            child: child,
-          ),
+          ContentPanel(padding: contentPadding, child: child),
           if (footer != null) ...[
             const SizedBox(height: 8),
             Text(

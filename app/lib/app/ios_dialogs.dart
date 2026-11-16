@@ -36,7 +36,7 @@ Widget iosAppBuilder(
   );
 }
 
-/// iOS 提示框（单按钮）。
+/// 纸面提示框（单按钮）：标题 15/600、正文 13/1.6、按钮 14/600。
 Future<void> showIosAlert({
   required BuildContext context,
   required String title,
@@ -45,25 +45,21 @@ Future<void> showIosAlert({
 }) {
   return showCupertinoDialog<void>(
     context: context,
-    builder: (ctx) => CupertinoAlertDialog(
-      title: Text(title),
-      content: Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Text(message),
-      ),
+    builder: (ctx) => _PaperDialog(
+      title: title,
+      message: message,
       actions: [
-        CupertinoDialogAction(
-          isDefaultAction: true,
+        _DialogButton(
+          label: okLabel,
           onPressed: () => Navigator.pop(ctx),
-          child: Text(okLabel),
+          primary: true,
         ),
       ],
     ),
   );
 }
 
-/// iOS 二选一确认框。返回 true=确认，false/取消屏障=false。
-/// [destructive] 时确认按钮用系统红。
+/// 纸面二选一确认框。返回 true=确认，false/取消屏障=false。
 Future<bool> showIosConfirm({
   required BuildContext context,
   required String title,
@@ -75,27 +71,143 @@ Future<bool> showIosConfirm({
   final r = await showCupertinoDialog<bool>(
     context: context,
     barrierDismissible: true,
-    builder: (ctx) => CupertinoAlertDialog(
-      title: Text(title),
-      content: Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Text(message),
-      ),
+    builder: (ctx) => _PaperDialog(
+      title: title,
+      message: message,
       actions: [
-        CupertinoDialogAction(
+        _DialogButton(
+          label: cancelLabel,
           onPressed: () => Navigator.pop(ctx, false),
-          child: Text(cancelLabel),
         ),
-        CupertinoDialogAction(
-          isDefaultAction: !destructive,
-          isDestructiveAction: destructive,
+        _DialogButton(
+          label: confirmLabel,
+          destructive: destructive,
+          primary: !destructive,
           onPressed: () => Navigator.pop(ctx, true),
-          child: Text(confirmLabel),
         ),
       ],
     ),
   );
   return r ?? false;
+}
+
+/// 纸面弹窗外壳：与 App 同一套字阶与纸色，不再是系统大字号。
+class _PaperDialog extends StatelessWidget {
+  const _PaperDialog({
+    required this.title,
+    required this.message,
+    required this.actions,
+  });
+
+  final String title;
+  final String message;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = paperOf(context);
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Container(
+            decoration: BoxDecoration(
+              color: p.surface,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: p.hairline, width: 0.7),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.2,
+                      color: p.ink,
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+                  child: Text(
+                    message,
+                    style: TextStyle(
+                      fontSize: 13,
+                      height: 1.6,
+                      color: p.muted,
+                    ),
+                  ),
+                ),
+                Container(height: 0.6, color: p.hairline),
+                Row(
+                  children: [
+                    for (var i = 0; i < actions.length; i++) ...[
+                      if (i > 0)
+                        Container(width: 0.6, height: 48, color: p.hairline),
+                      Expanded(child: actions[i]),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogButton extends StatelessWidget {
+  const _DialogButton({
+    required this.label,
+    required this.onPressed,
+    this.primary = false,
+    this.destructive = false,
+  });
+
+  final String label;
+  final VoidCallback onPressed;
+  final bool primary;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = paperOf(context);
+    final color = destructive
+        ? const Color(0xFFB3261E)
+        : primary
+        ? p.ink
+        : p.muted;
+    return CupertinoButton(
+      padding: EdgeInsets.zero,
+      minimumSize: Size.zero,
+      onPressed: onPressed,
+      child: SizedBox(
+        height: 48,
+        width: double.infinity,
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.4,
+              fontWeight: primary || destructive
+                  ? FontWeight.w600
+                  : FontWeight.w500,
+              color: color,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// 动作表条目。
@@ -106,7 +218,8 @@ class IosAction<T> {
   final bool destructive;
 }
 
-/// iOS 动作表（底部弹出的选项列表，替代 Material PopupMenu）。
+/// 纸面动作表：底部弹层里的选项列表（替代 Material PopupMenu）。
+/// 行高 52、文字 14、发丝分隔；危险项用系统红。
 Future<T?> showIosActionSheet<T>({
   required BuildContext context,
   String? title,
@@ -114,23 +227,97 @@ Future<T?> showIosActionSheet<T>({
   required List<IosAction<T>> actions,
   String cancelLabel = '取消',
 }) {
-  return showCupertinoModalPopup<T>(
-    context: context,
-    builder: (ctx) => CupertinoActionSheet(
-      title: title == null ? null : Text(title),
-      message: message == null ? null : Text(message),
-      actions: [
-        for (final a in actions)
-          CupertinoActionSheetAction(
-            isDestructiveAction: a.destructive,
-            onPressed: () => Navigator.pop(ctx, a.value),
-            child: Text(a.label),
+  return Navigator.of(context, rootNavigator: true).push<T>(
+    _IosSheetRoute<T>(
+      barrierDismissible: true,
+      builder: (ctx) {
+        final p = paperOf(ctx);
+        Widget row(String label, VoidCallback onTap, {bool danger = false}) =>
+            CupertinoButton(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              onPressed: onTap,
+              child: SizedBox(
+                height: 52,
+                width: double.infinity,
+                child: Center(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: danger ? FontWeight.w600 : FontWeight.w500,
+                      color: danger ? const Color(0xFFB3261E) : p.ink,
+                    ),
+                  ),
+                ),
+              ),
+            );
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                decoration: BoxDecoration(
+                  color: p.surface,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: p.hairline, width: 0.7),
+                ),
+                child: Column(
+                  children: [
+                    if (title != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                        child: Text(
+                          title,
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: p.ink,
+                          ),
+                        ),
+                      ),
+                    if (message != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                        child: Text(
+                          message,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            height: 1.5,
+                            color: p.muted,
+                          ),
+                        ),
+                      ),
+                    if (title != null || message != null)
+                      const SizedBox(height: 12),
+                    for (var i = 0; i < actions.length; i++) ...[
+                      if (i > 0)
+                        Container(height: 0.6, color: p.hairline),
+                      row(
+                        actions[i].label,
+                        () => Navigator.pop(ctx, actions[i].value),
+                        danger: actions[i].destructive,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: p.surface,
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: p.hairline, width: 0.7),
+                ),
+                child: row(cancelLabel, () => Navigator.pop(ctx)),
+              ),
+            ],
           ),
-      ],
-      cancelButton: CupertinoActionSheetAction(
-        onPressed: () => Navigator.pop(ctx),
-        child: Text(cancelLabel),
-      ),
+        );
+      },
     ),
   );
 }
@@ -195,36 +382,92 @@ class _IosTextPromptDialogState extends State<_IosTextPromptDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return CupertinoAlertDialog(
-      title: Text(widget.title),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (widget.message != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Text(widget.message!),
+    final p = paperOf(context);
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 320),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Container(
+            decoration: BoxDecoration(
+              color: p.surface,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: p.hairline, width: 0.7),
             ),
-          const SizedBox(height: 12),
-          CupertinoTextField(
-            controller: _controller,
-            autofocus: true,
-            placeholder: widget.placeholder,
-            clearButtonMode: OverlayVisibilityMode.editing,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+                  child: Text(
+                    widget.title,
+                    style: TextStyle(
+                      fontSize: 15,
+                      height: 1.4,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.2,
+                      color: p.ink,
+                    ),
+                  ),
+                ),
+                if (widget.message != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 6, 20, 0),
+                    child: Text(
+                      widget.message!,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.6,
+                        color: p.muted,
+                      ),
+                    ),
+                  ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: p.milk,
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: p.hairline, width: 0.7),
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    child: CupertinoTextField(
+                      controller: _controller,
+                      autofocus: true,
+                      placeholder: widget.placeholder,
+                      clearButtonMode: OverlayVisibilityMode.editing,
+                      style: TextStyle(fontSize: 13, color: p.ink),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: const BoxDecoration(),
+                    ),
+                  ),
+                ),
+                Container(height: 0.6, color: p.hairline),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _DialogButton(
+                        label: widget.cancelLabel,
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                    Container(width: 0.6, height: 48, color: p.hairline),
+                    Expanded(
+                      child: _DialogButton(
+                        label: widget.confirmLabel,
+                        primary: true,
+                        onPressed: () =>
+                            Navigator.pop(context, _controller.text.trim()),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
-      actions: [
-        CupertinoDialogAction(
-          onPressed: () => Navigator.pop(context),
-          child: Text(widget.cancelLabel),
-        ),
-        CupertinoDialogAction(
-          isDefaultAction: true,
-          onPressed: () => Navigator.pop(context, _controller.text.trim()),
-          child: Text(widget.confirmLabel),
-        ),
-      ],
     );
   }
 }

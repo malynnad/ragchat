@@ -357,8 +357,6 @@ class _QaPageState extends State<QaPage> {
     return Align(
       alignment: Alignment.centerLeft,
       child: ContentPanel(
-        // 聊天气泡不画四角定位标：消息密度高，标线会贴着首字。
-        registration: false,
         padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

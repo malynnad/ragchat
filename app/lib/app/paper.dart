@@ -289,13 +289,11 @@ class ContentPanel extends StatefulWidget {
     required this.child,
     this.padding = const EdgeInsets.all(18),
     this.onTap,
-    this.registration = true,
   });
 
   final Widget child;
   final EdgeInsets padding;
   final VoidCallback? onTap;
-  final bool registration;
 
   @override
   State<ContentPanel> createState() => _ContentPanelState();
@@ -315,21 +313,7 @@ class _ContentPanelState extends State<ContentPanel> {
         border: Border.all(color: p.hairline, width: 0.7),
       ),
       padding: widget.padding,
-      child: Stack(
-        children: [
-          if (widget.registration)
-            Positioned.fill(
-              child: IgnorePointer(
-                child: CustomPaint(
-                  painter: _RegistrationPainter(
-                    color: p.ink.withValues(alpha: .5),
-                  ),
-                ),
-              ),
-            ),
-          widget.child,
-        ],
-      ),
+      child: widget.child,
     );
 
     if (widget.onTap == null) return card;
@@ -353,35 +337,6 @@ class _ContentPanelState extends State<ContentPanel> {
       ),
     );
   }
-}
-
-/// 四角 7px 折角定位标（线宽 .7，墨色 alpha .5），只用于纸卡。
-class _RegistrationPainter extends CustomPainter {
-  _RegistrationPainter({required this.color});
-
-  final Color color;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    const inset = 2.0;
-    const arm = 5.5;
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 0.7
-      ..style = PaintingStyle.stroke;
-    void corner(Offset o, double dx, double dy) {
-      canvas.drawLine(o, o + Offset(dx * arm, 0), paint);
-      canvas.drawLine(o, o + Offset(0, dy * arm), paint);
-    }
-
-    corner(const Offset(inset, inset), 1, 1);
-    corner(Offset(size.width - inset, inset), -1, 1);
-    corner(Offset(inset, size.height - inset), 1, -1);
-    corner(Offset(size.width - inset, size.height - inset), -1, -1);
-  }
-
-  @override
-  bool shouldRepaint(_RegistrationPainter old) => old.color != color;
 }
 
 /// 玻璃基材：模糊 8 + 奶白 87%，亮边只在左上，投影只在轮廓外。
