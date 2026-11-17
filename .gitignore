@@ -13,3 +13,6 @@ app/.idea/
 .shots/
 dsh-image-gen/
 *.apk
+app/android/key.properties
+*.jks
+*.keystore

@@ -30,6 +30,6 @@
 
 ```
 文件    ragchat-1.0.0-arm64.apk
-sha256  732a8e88e3a5e816d5fc0f9306a7e10bb0de3322b8736bafff94281733810491
+sha256  07d27dcc1d89aa8e8cff1777c7927f34a530fc8e6005c0ad9e20084d2ebb8d04
 大小    46 MB
 ```
