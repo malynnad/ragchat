@@ -69,6 +69,28 @@ PaperPalette paperOf(BuildContext context) =>
     ? PaperPalette.dark
     : PaperPalette.light;
 
+/// 键盘开合状态往外传：页面里的底部留白要据此让位给 dock 或键盘。
+/// 外层 Scaffold 会把 viewInsets 从子树里移掉，页面自己读不到，只能由 shell 传。
+class KeyboardDockScope extends InheritedWidget {
+  const KeyboardDockScope({
+    super.key,
+    required this.keyboardOpen,
+    required super.child,
+  });
+
+  final bool keyboardOpen;
+
+  static bool of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<KeyboardDockScope>()
+          ?.keyboardOpen ??
+      false;
+
+  @override
+  bool updateShouldNotify(KeyboardDockScope old) =>
+      old.keyboardOpen != keyboardOpen;
+}
+
 /// 版面常量。
 const double kPageMargin = 24;
 const double kToolbarHeight = 56;
@@ -624,13 +646,20 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton>
             animation: _c,
             builder: (context, _) {
               final v = _c.value;
-              final textColor = Color.lerp(_danger, p.milk, (v * 1.6).clamp(0, 1))!;
+              final textColor = Color.lerp(
+                _danger,
+                p.milk,
+                (v * 1.6).clamp(0, 1),
+              )!;
               return Container(
                 height: 48,
                 width: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: _danger.withValues(alpha: .7), width: 0.7),
+                  border: Border.all(
+                    color: _danger.withValues(alpha: .7),
+                    width: 0.7,
+                  ),
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Stack(
@@ -776,7 +805,8 @@ class PaperScaffold extends StatelessWidget {
     // 底色透明，纸面来自 Atmosphere。
     return Scaffold(
       backgroundColor: Colors.transparent,
-      resizeToAvoidBottomInset: true,
+      // 键盘 inset 由外层 shell 的 Scaffold 统一处理，内层再缩一次会重复让位。
+      resizeToAvoidBottomInset: false,
       body: Atmosphere(
         child: Column(
           children: [

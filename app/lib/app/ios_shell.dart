@@ -56,88 +56,97 @@ class _IosShellState extends State<IosShell> {
     return Scaffold(
       backgroundColor: p.bg,
       body: Atmosphere(
-        child: Stack(
-          children: [
-            SafeArea(
-              bottom: false,
-              child: Column(
-                children: [
-                  if (state.loadStage.isNotEmpty && !state.gatewayLoaded)
-                    _Banner(
-                      child: Row(
-                        children: [
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CupertinoActivityIndicator(radius: 7),
-                          ),
-                          const SizedBox(width: 9),
-                          Expanded(
-                            child: Text(
-                              state.loadStage,
-                              style: TextStyle(
-                                fontSize: kFontCaption,
-                                color: p.muted,
+        child: KeyboardDockScope(
+          keyboardOpen: keyboardOpen,
+          child: Stack(
+            children: [
+              SafeArea(
+                bottom: false,
+                child: Column(
+                  children: [
+                    if (state.loadStage.isNotEmpty && !state.gatewayLoaded)
+                      _Banner(
+                        child: Row(
+                          children: [
+                            const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CupertinoActivityIndicator(radius: 7),
+                            ),
+                            const SizedBox(width: 9),
+                            Expanded(
+                              child: Text(
+                                state.loadStage,
+                                style: TextStyle(
+                                  fontSize: kFontCaption,
+                                  color: p.muted,
+                                ),
                               ),
                             ),
-                          ),
+                          ],
+                        ),
+                      ),
+                    if (state.loadError != null)
+                      _Banner(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '模型加载失败：${state.loadError}',
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: kFontCaption,
+                                  color: const Color(0xFFB3261E),
+                                ),
+                              ),
+                            ),
+                            CupertinoButton(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              minimumSize: Size.zero,
+                              onPressed: state.warmUp,
+                              child: Text(
+                                '重试',
+                                style: TextStyle(fontSize: kFontControl),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    Expanded(
+                      child: IndexedStack(
+                        index: _index,
+                        children: const [
+                          QaPage(),
+                          MemoryPage(),
+                          SettingsPage(),
                         ],
                       ),
                     ),
-                  if (state.loadError != null)
-                    _Banner(
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              '模型加载失败：${state.loadError}',
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: kFontCaption,
-                                color: const Color(0xFFB3261E),
-                              ),
-                            ),
-                          ),
-                          CupertinoButton(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            minimumSize: Size.zero,
-                            onPressed: state.warmUp,
-                            child: Text(
-                              '重试',
-                              style: TextStyle(fontSize: kFontControl),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  Expanded(
-                    child: IndexedStack(
-                      index: _index,
-                      children: const [QaPage(), MemoryPage(), SettingsPage()],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // 悬空 dock：只有这颗胶囊，没有底衬；内容滚到它下面时被玻璃模糊。
-            // 键盘弹出时整条滑下去消失，把高度让给输入框。
-            AnimatedPositioned(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOutCubic,
-              left: 0,
-              right: 0,
-              bottom: keyboardOpen ? -kDockHeight - 32 : 0,
-              child: IgnorePointer(
-                ignoring: keyboardOpen,
-                child: GlassDock(
-                  selectedIndex: _index,
-                  onSelected: (i) => setState(() => _index = i),
-                  items: _items,
+                  ],
                 ),
               ),
-            ),
-          ],
+              // 悬空 dock：只有这颗胶囊，没有底衬；内容滚到它下面时被玻璃模糊。
+              // 键盘弹出时整条滑下去消失，把高度让给输入框。
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOutCubic,
+                left: 0,
+                right: 0,
+                bottom: keyboardOpen ? -kDockHeight - 32 : 0,
+                child: IgnorePointer(
+                  ignoring: keyboardOpen,
+                  child: GlassDock(
+                    selectedIndex: _index,
+                    onSelected: (i) => setState(() => _index = i),
+                    items: _items,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

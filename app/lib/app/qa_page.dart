@@ -273,7 +273,12 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
           Expanded(
             child: ListView(
               controller: _scroll,
-              padding: const EdgeInsets.fromLTRB(kPageMargin, 8, kPageMargin, 120),
+              padding: const EdgeInsets.fromLTRB(
+                kPageMargin,
+                8,
+                kPageMargin,
+                120,
+              ),
               children: [
                 if (_entries.isEmpty) _emptyState(p),
                 for (final e in _entries)
@@ -315,7 +320,11 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
           Text(
             '说点什么就会记在这里。开启新对话时会自动整理记忆。',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: kFontCaption, height: 1.6, color: p.muted),
+            style: TextStyle(
+              fontSize: kFontCaption,
+              height: 1.6,
+              color: p.muted,
+            ),
           ),
         ],
       ),
@@ -325,15 +334,17 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
   Widget _inputBar(BuildContext context) {
     final p = paperOf(context);
     // 键盘收起时给悬空 dock 让位；键盘弹起时 dock 已滑走，只需常规留白。
-    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final keyboardOpen = KeyboardDockScope.of(context);
     return SafeArea(
       top: false,
+      // 键盘弹起时底部安全区已被键盘吃掉了，再留一次就会在输入框下空一条。
+      bottom: !keyboardOpen,
       child: Padding(
         padding: EdgeInsets.fromLTRB(
           kPageMargin,
           8,
           kPageMargin,
-          keyboardOpen ? 12 : kDockReserve,
+          keyboardOpen ? 8 : kDockReserve,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
@@ -364,8 +375,7 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
             ),
             const SizedBox(width: 8),
             if (_busy)
-              GlassTextButton(
-                label: '停止',
+              _StopButton(
                 onPressed: () => AppStateScope.of(context).stopGeneration(),
               )
             else
@@ -390,11 +400,7 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
           ),
           child: Text(
             e.text,
-            style: TextStyle(
-              fontSize: kFontBody,
-              height: 1.5,
-              color: p.milk,
-            ),
+            style: TextStyle(fontSize: kFontBody, height: 1.5, color: p.milk),
           ),
         ),
       );
@@ -409,7 +415,10 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
           mainAxisSize: MainAxisSize.min,
           children: [
             if (a.contextFull)
-              _noticeRow(icon: CupertinoIcons.hourglass, text: '上下文将满，本轮未生成。请开启新对话。'),
+              _noticeRow(
+                icon: CupertinoIcons.hourglass,
+                text: '上下文将满，本轮未生成。请开启新对话。',
+              ),
             if (a.timedOut)
               _noticeRow(
                 icon: CupertinoIcons.hourglass,
@@ -419,17 +428,27 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
                           '把「随机性」调到稳定再试。',
               ),
             if (a.error)
-              _noticeRow(icon: CupertinoIcons.exclamationmark_circle, text: '生成失败，请重试。'),
+              _noticeRow(
+                icon: CupertinoIcons.exclamationmark_circle,
+                text: '生成失败，请重试。',
+              ),
             if (!a.busy &&
                 a.answer.isEmpty &&
                 !a.error &&
                 !a.contextFull &&
                 !a.timedOut)
-              _noticeRow(icon: CupertinoIcons.stop_circle, text: '本轮未生成回复（可能已停止）。'),
+              _noticeRow(
+                icon: CupertinoIcons.stop_circle,
+                text: '本轮未生成回复（可能已停止）。',
+              ),
             if (a.answer.isNotEmpty)
               Text(
                 a.answer,
-                style: TextStyle(fontSize: kFontBody, height: 1.6, color: p.ink),
+                style: TextStyle(
+                  fontSize: kFontBody,
+                  height: 1.6,
+                  color: p.ink,
+                ),
               ),
             if (a.busy)
               Padding(
@@ -508,10 +527,58 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
           Expanded(
             child: Text(
               text,
-              style: TextStyle(fontSize: kFontCaption, height: 1.5, color: p.ink),
+              style: TextStyle(
+                fontSize: kFontCaption,
+                height: 1.5,
+                color: p.ink,
+              ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 停止：和发送同款圆形墨块，里面换成 X。
+class _StopButton extends StatefulWidget {
+  const _StopButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  State<_StopButton> createState() => _StopButtonState();
+}
+
+class _StopButtonState extends State<_StopButton> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = paperOf(context);
+    return Semantics(
+      label: '停止',
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: (_) {
+          if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) return;
+          setState(() => _down = true);
+        },
+        onTapCancel: () => setState(() => _down = false),
+        onTapUp: (_) => setState(() => _down = false),
+        onTap: widget.onPressed,
+        child: AnimatedScale(
+          scale: _down ? .97 : 1,
+          duration: _down ? kContact : kSettle,
+          curve: kSettleCurve,
+          child: Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(color: p.ink, shape: BoxShape.circle),
+            child: Icon(CupertinoIcons.xmark, size: 20, color: p.milk),
+          ),
+        ),
       ),
     );
   }
