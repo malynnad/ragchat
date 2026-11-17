@@ -94,7 +94,7 @@ void main() {
     await tester.pump();
     await pumpUntilIdle(tester);
 
-    await tester.tap(find.byIcon(CupertinoIcons.add_circled));
+    await tester.tap(find.text('new'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('新对话'));
     await tester.pumpAndSettle();

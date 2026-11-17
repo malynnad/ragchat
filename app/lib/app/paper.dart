@@ -738,34 +738,39 @@ class ArchiveHeaderBar extends StatelessWidget {
           height: kToolbarHeight,
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: kPageMargin),
-            child: Row(
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                ?leading,
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: p.ink,
-                        ),
+                // 标题永远居中于整条工具栏，不受左右两侧宽度影响。
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: p.ink,
                       ),
-                      if (code != null) ...[
-                        const SizedBox(height: 3),
-                        ArchiveCode(code!),
-                      ],
+                    ),
+                    if (code != null) ...[
+                      const SizedBox(height: 3),
+                      ArchiveCode(code!),
                     ],
+                  ],
+                ),
+                if (leading != null)
+                  Align(alignment: Alignment.centerLeft, child: leading!),
+                if (actions != null && actions!.isNotEmpty)
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: actions!,
+                    ),
                   ),
-                ),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: actions ?? const [],
-                ),
               ],
             ),
           ),

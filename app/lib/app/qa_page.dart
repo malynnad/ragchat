@@ -8,7 +8,6 @@ import 'package:material_ui/material_ui.dart';
 import '../rag/models.dart';
 import 'app_state.dart';
 import 'ios_dialogs.dart';
-import 'ios_widgets.dart';
 import 'paper.dart';
 import 'theme.dart';
 
@@ -257,15 +256,35 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
       title: '聊天',
       code: '01 / CONVERSATION',
       scrollable: false,
+      // 左边新建、右边上下文用量，标题居中不偏。
+      leading: CupertinoButton(
+        padding: EdgeInsets.zero,
+        minimumSize: Size.zero,
+        onPressed: _busy ? null : () => _newConversation(),
+        child: SizedBox(
+          width: 46,
+          height: 46,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Semantics(
+              label: '新建对话',
+              button: true,
+              child: Text(
+                'new',
+                style: TextStyle(
+                  fontSize: kFontControl,
+                  fontWeight: FontWeight.w600,
+                  color: _busy ? p.muted : p.ink,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
       actions: [
         Text(
           '${(usage * 100).round()}%',
           style: TextStyle(fontSize: kFontCode, color: usageColor),
-        ),
-        IosNavBarAction(
-          icon: CupertinoIcons.add_circled,
-          tooltip: '新对话',
-          onPressed: _busy ? null : () => _newConversation(),
         ),
       ],
       body: Column(
