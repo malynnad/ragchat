@@ -131,7 +131,7 @@ class _IosShellState extends State<IosShell> {
               // 悬空 dock：只有这颗胶囊，没有底衬；内容滚到它下面时被玻璃模糊。
               // 键盘弹出时整条滑下去消失，把高度让给输入框。
               AnimatedPositioned(
-                duration: const Duration(milliseconds: 160),
+                duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
                 left: 0,
                 right: 0,

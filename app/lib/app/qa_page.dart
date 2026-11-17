@@ -354,16 +354,19 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
     final p = paperOf(context);
     // 键盘收起时给悬空 dock 让位；键盘弹起时 dock 已滑走，只需常规留白。
     final keyboardOpen = KeyboardDockScope.of(context);
-    return SafeArea(
-      top: false,
-      // 键盘弹起时底部安全区已被键盘吃掉了，再留一次就会在输入框下空一条。
-      bottom: !keyboardOpen,
-      child: Padding(
+    // 系统底部 inset 用 viewPadding 取常量（不受键盘影响）。
+    // 不套 SafeArea：它一开一关会让输入框在键盘收起瞬间跳一下。
+    final navInset = MediaQuery.viewPaddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.only(bottom: 0),
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
         padding: EdgeInsets.fromLTRB(
           kPageMargin,
           8,
           kPageMargin,
-          keyboardOpen ? 8 : kDockReserve,
+          keyboardOpen ? 8 : kDockReserve + navInset,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,
