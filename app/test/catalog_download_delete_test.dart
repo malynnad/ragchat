@@ -136,7 +136,8 @@ void main() {
 
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('40%'), findsOneWidget);
-      expect(find.byIcon(CupertinoIcons.trash), findsOneWidget);
+      // 一个在已下载的模型行，一个在「删除聊天数据」的按住按钮上。
+      expect(find.byIcon(CupertinoIcons.trash), findsNWidgets(2));
       expect(tester.takeException(), isNull);
     });
   });

@@ -362,7 +362,6 @@ class AppState extends ChangeNotifier {
       embedModelPath: settings.embedModelPath,
       useGpu: settings.useGpu,
       temperature: settings.temperature,
-      enableThinking: settings.enableThinking,
       onLoadProgress: (stage) {
         loadStage = stage;
         notifyListeners();
@@ -401,17 +400,10 @@ class AppState extends ChangeNotifier {
   /// 采样温度：立即生效（下次生成），不用重载模型。
   Future<void> updateTemperature(double value) async {
     settings.temperature = value;
+    // 先刷 UI，再落盘：文件 IO 不该挡住滑块的即时反馈。
+    notifyListeners();
     await settings.save(_supportDir);
     await _gateway?.setTemperature(value);
-    notifyListeners();
-  }
-
-  /// 思考开关：改了要重载模型才生效（chat template 变量在加载时传）。
-  Future<void> updateThinking(bool value) async {
-    settings.enableThinking = value;
-    await settings.save(_supportDir);
-    notifyListeners();
-    await reloadModels();
   }
 
   /// US-9：停止生成。

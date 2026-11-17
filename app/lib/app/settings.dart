@@ -16,7 +16,6 @@ class AppSettings {
     this.personasJson,
     this.accentId = 'blue',
     this.temperature = 0.6,
-    this.enableThinking = false,
   });
 
   /// ADR-0005：默认 CPU；GPU 仅作开关
@@ -42,9 +41,6 @@ class AppSettings {
 
   /// 采样温度：越低越稳（2B 模型高了容易语无伦次），默认 0.6。
   double temperature;
-
-  /// 是否允许模型「思考」（Qwen3 系）；开了更稳但明显变慢，默认关。
-  bool enableThinking;
 
   /// 当前人设卡（列表里找不到 activePersonaId 时回退第一张）。
   PersonaCard activePersona(List<PersonaCard> cards) => cards.firstWhere(
@@ -72,7 +68,6 @@ class AppSettings {
         personasJson: j['personasJson'] as String?,
         accentId: j['accentId'] as String? ?? 'blue',
         temperature: (j['temperature'] as num?)?.toDouble() ?? 0.6,
-        enableThinking: j['enableThinking'] as bool? ?? false,
       );
     } catch (_) {
       return AppSettings();
@@ -90,7 +85,6 @@ class AppSettings {
         'personasJson': personasJson ?? PersonaCard.encodeList(builtinPersonas),
         'accentId': accentId,
         'temperature': temperature,
-        'enableThinking': enableThinking,
       }),
     );
   }

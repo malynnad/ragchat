@@ -32,6 +32,9 @@ class _AssistantEntry {
   bool busy = false;
   bool contextFull = false;
   bool error = false;
+
+  /// 看门狗触发：生成太久被自动掐掉。
+  bool timedOut = false;
   DateTime? startedAt;
   Duration? elapsed;
 }
@@ -42,6 +45,7 @@ class _QaPageState extends State<QaPage> {
   final _entries = <Object>[]; // _UserEntry | _AssistantEntry
   bool _busy = false;
   StreamSubscription<AnswerEvent>? _sub;
+  Timer? _watchdog;
   bool _restored = false;
 
   /// 「新对话」动作总线订阅（保留接缝，供外部触发）。
@@ -76,6 +80,7 @@ class _QaPageState extends State<QaPage> {
   @override
   void dispose() {
     _busState?.newConversationBus.removeListener(_onNewConversationBus);
+    _watchdog?.cancel();
     _sub?.cancel();
     _controller.dispose();
     _scroll.dispose();
@@ -99,6 +104,7 @@ class _QaPageState extends State<QaPage> {
     _scrollToBottom();
     final assistant = _entries.last as _AssistantEntry;
     assistant.startedAt = DateTime.now();
+    _startWatchdog(assistant);
     try {
       final service = await state.ensureChat();
       _sub = service
@@ -113,6 +119,7 @@ class _QaPageState extends State<QaPage> {
               setState(() {
                 if (e is AnswerToken) assistant.answer += e.text;
                 if (e is AnswerDone) {
+                  _watchdog?.cancel();
                   assistant.busy = false;
                   assistant.elapsed = assistant.startedAt == null
                       ? null
@@ -124,11 +131,13 @@ class _QaPageState extends State<QaPage> {
                   }
                 }
                 if (e is AnswerContextFull) {
+                  _watchdog?.cancel();
                   assistant.contextFull = true;
                   assistant.busy = false;
                   _busy = false;
                 }
                 if (e is AnswerError) {
+                  _watchdog?.cancel();
                   assistant.error = true;
                   assistant.busy = false;
                   _busy = false;
@@ -154,6 +163,23 @@ class _QaPageState extends State<QaPage> {
         _busy = false;
       });
     }
+  }
+
+  /// 生成看门狗：2B 模型偶尔会长时间自言自语，45s 还没完就停掉。
+  void _startWatchdog(_AssistantEntry assistant) {
+    _watchdog?.cancel();
+    _watchdog = Timer(const Duration(seconds: 45), () {
+      if (!mounted || !assistant.busy) return;
+      AppStateScope.of(context).stopGeneration();
+      setState(() {
+        assistant.timedOut = true;
+        assistant.busy = false;
+        _busy = false;
+        assistant.elapsed = assistant.startedAt == null
+            ? null
+            : DateTime.now().difference(assistant.startedAt!);
+      });
+    });
   }
 
   /// ADR-0006/0009：新对话清空屏幕记录与会话历史；
@@ -364,9 +390,21 @@ class _QaPageState extends State<QaPage> {
           children: [
             if (a.contextFull)
               _noticeRow(icon: CupertinoIcons.hourglass, text: '上下文将满，本轮未生成。请开启新对话。'),
+            if (a.timedOut)
+              _noticeRow(
+                icon: CupertinoIcons.hourglass,
+                text: a.elapsed == null
+                    ? '生成太久，已自动停止。'
+                    : '生成超过 ${a.elapsed!.inSeconds} 秒，已自动停止。'
+                          '把「随机性」调到稳定再试。',
+              ),
             if (a.error)
               _noticeRow(icon: CupertinoIcons.exclamationmark_circle, text: '生成失败，请重试。'),
-            if (!a.busy && a.answer.isEmpty && !a.error && !a.contextFull)
+            if (!a.busy &&
+                a.answer.isEmpty &&
+                !a.error &&
+                !a.contextFull &&
+                !a.timedOut)
               _noticeRow(icon: CupertinoIcons.stop_circle, text: '本轮未生成回复（可能已停止）。'),
             if (a.answer.isNotEmpty)
               Text(

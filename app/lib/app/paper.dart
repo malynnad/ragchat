@@ -9,9 +9,11 @@
 // ignore: deprecated_member_use
 import 'dart:ui' show ImageFilter;
 
+import 'package:flutter/cupertino.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'motion.dart';
+import 'theme.dart';
 
 /// 纸与墨的两套色（浅 / 深）。不新增彩色强调色，层级只靠明度。
 class PaperPalette {
@@ -540,6 +542,131 @@ class _GlassTextButtonState extends State<GlassTextButton> {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 按住才会触发的危险按钮：按下去红色从左往右填满一格（默认 0.9s），
+/// 填满才回调；中途松手立刻回退，不弹窗。
+class HoldToConfirmButton extends StatefulWidget {
+  const HoldToConfirmButton({
+    super.key,
+    required this.label,
+    required this.onCompleted,
+    this.hold = const Duration(milliseconds: 900),
+  });
+
+  final String label;
+  final VoidCallback onCompleted;
+  final Duration hold;
+
+  @override
+  State<HoldToConfirmButton> createState() => _HoldToConfirmButtonState();
+}
+
+class _HoldToConfirmButtonState extends State<HoldToConfirmButton>
+    with SingleTickerProviderStateMixin {
+  late final _c = AnimationController(vsync: this, duration: widget.hold);
+  bool _fired = false;
+
+  static const _danger = Color(0xFFB3261E);
+
+  @override
+  void initState() {
+    super.initState();
+    _c.addStatusListener((s) {
+      if (s == AnimationStatus.completed && !_fired) {
+        _fired = true;
+        macHaptic(MacHaptic.medium);
+        widget.onCompleted();
+        // 复位，等下一次按住重新填。
+        Future<void>.delayed(const Duration(milliseconds: 220), () {
+          if (mounted) _c.value = 0;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  void _down(_) {
+    _fired = false;
+    _c.forward(from: 0);
+  }
+
+  void _up() {
+    if (!_fired && _c.isAnimating) {
+      _c.animateBack(0, duration: const Duration(milliseconds: 200));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final p = paperOf(context);
+    return Semantics(
+      button: true,
+      label: widget.label,
+      hint: '按住不放，进度填满后弹出确认',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTapDown: _down,
+        onTapUp: (_) => _up(),
+        onTapCancel: _up,
+        child: LayoutBuilder(
+          builder: (context, constraints) => AnimatedBuilder(
+            animation: _c,
+            builder: (context, _) {
+              final v = _c.value;
+              final textColor = Color.lerp(_danger, p.milk, (v * 1.6).clamp(0, 1))!;
+              return Container(
+                height: 48,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(4),
+                  border: Border.all(color: _danger.withValues(alpha: .7), width: 0.7),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  children: [
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      bottom: 0,
+                      width: constraints.maxWidth * v,
+                      child: const ColoredBox(color: _danger),
+                    ),
+                    Center(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            CupertinoIcons.trash,
+                            size: 17,
+                            color: textColor,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            widget.label,
+                            style: TextStyle(
+                              fontSize: kFontControl,
+                              fontWeight: FontWeight.w600,
+                              color: textColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ),
       ),

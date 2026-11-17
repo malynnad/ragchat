@@ -284,17 +284,22 @@ class SettingsPage extends StatelessWidget {
     );
     return IosSection(
       header: '05 / STORAGE',
-      footer: '长按「聊天数据 DB」删除全部会话与记忆（不可恢复）。',
+      footer: '删除按钮要按满一格才会弹确认：按下去会从左往右变红，松手即取消。',
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
-          GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onLongPress: () => _confirmDeleteDb(context, state),
-            child: row('聊天数据 DB', formatBytes(stats.dbBytes)),
-          ),
+          row('聊天数据 DB', formatBytes(stats.dbBytes)),
           const Divider(height: 1),
           row('模型文件', formatBytes(stats.modelBytes)),
+          const Divider(height: 1),
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: HoldToConfirmButton(
+              key: const ValueKey('delete-db'),
+              label: '删除聊天数据',
+              onCompleted: () => _confirmDeleteDb(context, state),
+            ),
+          ),
         ],
       ),
     );
@@ -305,16 +310,15 @@ class SettingsPage extends StatelessWidget {
     final s = state.settings;
     final label = CupertinoColors.label.resolveFrom(context);
     final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    final p = paperOf(context);
     // 三档就近取整：0.4 稳定 / 0.7 平衡 / 1.0 活跃。
-    final tier = s.temperature <= 0.45
+    final tier = s.temperature <= 0.5
         ? 'steady'
         : s.temperature >= 0.75
         ? 'lively'
         : 'balanced';
     return IosSection(
       header: '04 / SAMPLING',
-      footer: '温度低更稳、少跑题；高了更容易语无伦次。思考打开后回答更稳，但首字明显变慢，切换会重载模型。',
+      footer: '温度低更稳、少跑题；高了更容易语无伦次。改完下一次生成就生效。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -344,7 +348,7 @@ class SettingsPage extends StatelessWidget {
               onValueChanged: (v) {
                 if (v == null) return;
                 final t = v == 'steady'
-                    ? 0.35
+                    ? 0.4
                     : v == 'lively'
                     ? 0.9
                     : 0.6;
@@ -357,35 +361,6 @@ class SettingsPage extends StatelessWidget {
             '当前 ${s.temperature.toStringAsFixed(1)}',
             style: TextStyle(fontSize: kFontCaption, color: secondary),
           ),
-          const Divider(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '思考（慢但更稳）',
-                      style: TextStyle(fontSize: kFontBody, color: label),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      s.enableThinking ? '已开启：回答更稳，等待更久' : '已关闭：先开口再说，速度优先',
-                      style: TextStyle(
-                        fontSize: kFontCaption,
-                        color: secondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              CupertinoSwitch(
-                value: s.enableThinking,
-                activeTrackColor: p.ink,
-                onChanged: (v) => state.updateThinking(v),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -395,7 +370,7 @@ class SettingsPage extends StatelessWidget {
   Future<void> _confirmDeleteDb(BuildContext context, AppState state) async {
     final ok = await showIosConfirm(
       context: context,
-      title: '删除聊天数据',
+      title: '删除全部聊天数据',
       message: '会话记录与记忆会一起删除，模型文件保留。此操作不可恢复。',
       confirmLabel: '删除',
       destructive: true,

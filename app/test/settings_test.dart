@@ -147,13 +147,12 @@ void main() {
       expect(broken.useGpu, isFalse);
     });
 
-    test('采样参数往返：温度与思考开关', () async {
+    test('采样温度往返（思考开关已移除）', () async {
       final dir = await tmpDir();
-      final s = AppSettings(temperature: 0.35, enableThinking: true);
+      final s = AppSettings(temperature: 0.4);
       await s.save(dir);
       final back = await AppSettings.load(dir);
-      expect(back.temperature, 0.35);
-      expect(back.enableThinking, isTrue);
+      expect(back.temperature, 0.4);
       expect(AppSettings().temperature, 0.6, reason: '默认平衡档');
     });
 
