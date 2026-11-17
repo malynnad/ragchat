@@ -55,6 +55,25 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('键盘弹出时 dock 滑出屏幕，把高度让给输入框', (tester) async {
+    final state = await buildState();
+    await tester.pumpWidget(wrap(state));
+    await tester.pumpAndSettle();
+
+    // 模拟键盘：底部 inset 320（测试窗口默认 800×600）。
+    tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+    addTearDown(tester.view.reset);
+    await tester.pumpAndSettle();
+
+    final dock = tester.getRect(find.byType(GlassDock));
+    expect(
+      dock.top,
+      greaterThanOrEqualTo(280),
+      reason: '键盘顶起后可视高度 280，dock 应完全落在可视区之外',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('点「记忆」切到记忆页空态', (tester) async {
     final state = await buildState();
     await tester.pumpWidget(wrap(state));

@@ -39,7 +39,7 @@ class _AssistantEntry {
   Duration? elapsed;
 }
 
-class _QaPageState extends State<QaPage> {
+class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   final _entries = <Object>[]; // _UserEntry | _AssistantEntry
@@ -50,6 +50,23 @@ class _QaPageState extends State<QaPage> {
 
   /// 「新对话」动作总线订阅（保留接缝，供外部触发）。
   AppState? _busState;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  /// 键盘顶起/收起会改可视高度：贴回底部，别让最后一条消息被切一半。
+  @override
+  void didChangeMetrics() {
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scroll.hasClients) {
+        _scroll.jumpTo(_scroll.position.maxScrollExtent);
+      }
+    });
+  }
 
   @override
   void didChangeDependencies() {
@@ -79,6 +96,7 @@ class _QaPageState extends State<QaPage> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _busState?.newConversationBus.removeListener(_onNewConversationBus);
     _watchdog?.cancel();
     _sub?.cancel();
@@ -306,14 +324,16 @@ class _QaPageState extends State<QaPage> {
 
   Widget _inputBar(BuildContext context) {
     final p = paperOf(context);
+    // 键盘收起时给悬空 dock 让位；键盘弹起时 dock 已滑走，只需常规留白。
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(
+        padding: EdgeInsets.fromLTRB(
           kPageMargin,
           8,
           kPageMargin,
-          kDockReserve,
+          keyboardOpen ? 12 : kDockReserve,
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.end,

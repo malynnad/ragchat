@@ -51,6 +51,8 @@ class _IosShellState extends State<IosShell> {
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final p = paperOf(context);
+    // 键盘弹出时把 dock 收起来：否则它被顶到输入框上方，可视区只剩一半。
+    final keyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
     return Scaffold(
       backgroundColor: p.bg,
       body: Atmosphere(
@@ -119,12 +121,15 @@ class _IosShellState extends State<IosShell> {
               ),
             ),
             // 悬空 dock：只有这颗胶囊，没有底衬；内容滚到它下面时被玻璃模糊。
-            Positioned(
+            // 键盘弹出时整条滑下去消失，把高度让给输入框。
+            AnimatedPositioned(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
               left: 0,
               right: 0,
-              bottom: 0,
+              bottom: keyboardOpen ? -kDockHeight - 32 : 0,
               child: IgnorePointer(
-                ignoring: false,
+                ignoring: keyboardOpen,
                 child: GlassDock(
                   selectedIndex: _index,
                   onSelected: (i) => setState(() => _index = i),
