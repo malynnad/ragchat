@@ -14,7 +14,7 @@
 
 ## 安装
 
-1. 下载 `ragchat-1.0.0.apk` 安装（applicationId `com.dannylam.ragchat`）
+1. 下载 `ragchat-1.0.0-arm64.apk` 安装（applicationId `com.dannylam.ragchat`；只装这一个，别装 x86_64 / armeabi 分裂包）
 2. 首次打开在模型准备页选一个模型下载：Qwen3.5-2B Q4（1.28 GB，默认）或 Qwen3-0.6B Q4（396 MB，更小更快）
 3. 确认后进主页，点左上 `new` 开始聊
 
@@ -29,6 +29,7 @@
 ## 校验
 
 ```
-sha256  2513fa70ab5af48cf2d0582ebf677d023c1b807d0b38ad5eca64292943700d37
-size    274 MiB
+文件    ragchat-1.0.0-arm64.apk
+sha256  732a8e88e3a5e816d5fc0f9306a7e10bb0de3322b8736bafff94281733810491
+大小    46 MB
 ```

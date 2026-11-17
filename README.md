@@ -64,9 +64,13 @@
 ```bash
 cd app
 flutter pub get
-flutter build apk --release
-adb install -r build/app/outputs/flutter-apk/app-release.apk
+flutter build apk --release --split-per-abi
+adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
+
+`--split-per-abi` 必须带：nobodywho 的 `libnobodywho_flutter.so` 单个就 110 MB，
+合成一个 APK 是 287 MB；按 ABI 拆开并压缩 `.so` 后，arm64 包只有 **46 MB**。
+x86_64 与 armeabi-v7a 包只给模拟器 / 老设备用，普通手机装 arm64 那个。
 
 ### 第一次打开
 

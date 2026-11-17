@@ -20,16 +20,22 @@ android {
         // nobodywho 要求 minSdk 24+；26 起步保证 Vulkan 驱动成熟度
         minSdk = 26
         targetSdk = flutter.targetSdkVersion
-        // 目标手机为 arm64（一加 Ace 5 Pro）；nobodywho 不支持 32 位
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
+        // ABI 由 `flutter build apk --split-per-abi` 控制（见 README），
+        // 这里再写 abiFilters 会和 split 冲突。
         // Uses the version code from pubspec.yaml. When using split APKs, 1000 * ABI_VERSION
         // is added automatically by Flutter. (https://developer.android.com/studio/build/configure-apk-splits#configure-APK-versions)
         // You can force using the value of versionCode by specifying the `-P force-version-code-ignoring-abi=true`
         // flag during build.
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+    }
+
+    packaging {
+        // 关键：.so 默认以「不压缩」方式存进 APK（AGP 8 默认），
+        // libnobodywho_flutter.so 一个就 110MB+；压缩后 APK 能砍掉近一半。
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     buildTypes {
