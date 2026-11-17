@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 纸色：与 Flutter 端 PaperPalette.light.bg (#F4F3EF) 保持一致，
+         避免冷启动时白屏闪一下再变纸色。 -->
+    <color name="paper_bg">#F4F3EF</color>
+</resources>
