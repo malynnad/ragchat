@@ -147,6 +147,16 @@ void main() {
       expect(broken.useGpu, isFalse);
     });
 
+    test('采样参数往返：温度与思考开关', () async {
+      final dir = await tmpDir();
+      final s = AppSettings(temperature: 0.35, enableThinking: true);
+      await s.save(dir);
+      final back = await AppSettings.load(dir);
+      expect(back.temperature, 0.35);
+      expect(back.enableThinking, isTrue);
+      expect(AppSettings().temperature, 0.6, reason: '默认平衡档');
+    });
+
     test('activePersona：激活 id 不在列表时回退第一张', () {
       final s = AppSettings(activePersonaId: 'ghost');
       final cards = [const PersonaCard(id: 'a', name: 'A')];

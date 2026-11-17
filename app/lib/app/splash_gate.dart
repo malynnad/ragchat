@@ -1,4 +1,4 @@
-// 开机动画：图标放大 + 透明度归零，然后交给主界面。
+// 开机动画：图标落在屏幕中央（120%），停 0.5s，然后急速放大冲出画面并淡出。
 // 一次性落定，不循环；开启「减少动态效果」时直接跳过。
 // ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
@@ -18,9 +18,10 @@ class SplashGate extends StatefulWidget {
 
 class _SplashGateState extends State<SplashGate>
     with SingleTickerProviderStateMixin {
+  /// 0–55%（约 0.5s）停留，55–100% 冲出画面并淡出。
   late final _c = AnimationController(
     vsync: this,
-    duration: const Duration(milliseconds: 1100),
+    duration: const Duration(milliseconds: 900),
   );
 
   bool _done = false;
@@ -45,25 +46,41 @@ class _SplashGateState extends State<SplashGate>
   @override
   Widget build(BuildContext context) {
     if (_done) return widget.child;
-    final reduce = MediaQuery.maybeDisableAnimationsOf(context) ?? false;
-    if (reduce) return widget.child;
-    // 0 → .55：放大到 1.18；.55 → 1：透明度归零。
+    if (MediaQuery.maybeDisableAnimationsOf(context) ?? false) {
+      return widget.child;
+    }
+
+    // 登场：120ms 内从 0.9 微弹到 1.2，然后停住。
     final scale = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween(begin: 0.86, end: 1.18).chain(
+        tween: Tween(begin: 0.9, end: 1.2).chain(
           CurveTween(curve: Curves.easeOutCubic),
         ),
-        weight: 55,
+        weight: 14,
       ),
-      TweenSequenceItem(tween: ConstantTween(1.18), weight: 45),
-    ]).animate(_c);
-    final opacity = TweenSequence<double>([
-      TweenSequenceItem(tween: ConstantTween(1.0), weight: 55),
+      TweenSequenceItem(tween: ConstantTween(1.2), weight: 42),
+      // 冲出画面：168 × 1.2 → 168 × 18，盖满 2780px 高的屏幕。
       TweenSequenceItem(
-        tween: Tween(begin: 1.0, end: 0.0).chain(
+        tween: Tween(begin: 1.2, end: 18.0).chain(
           CurveTween(curve: Curves.easeInCubic),
         ),
-        weight: 45,
+        weight: 44,
+      ),
+    ]).animate(_c);
+
+    final opacity = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween(begin: 0.0, end: 1.0).chain(
+          CurveTween(curve: Curves.easeOut),
+        ),
+        weight: 10,
+      ),
+      TweenSequenceItem(tween: ConstantTween(1.0), weight: 48),
+      TweenSequenceItem(
+        tween: Tween(begin: 1.0, end: 0.0).chain(
+          CurveTween(curve: Curves.easeIn),
+        ),
+        weight: 42,
       ),
     ]).animate(_c);
 

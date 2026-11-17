@@ -36,9 +36,9 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 28),
           _gpuSection(context, state),
           const SizedBox(height: 28),
-          _storageSection(context, stats),
+          _samplingSection(context, state),
           const SizedBox(height: 28),
-          _clearButton(context, state),
+          _storageSection(context, state, stats),
         ],
       ),
     );
@@ -260,6 +260,7 @@ class SettingsPage extends StatelessWidget {
 
   Widget _storageSection(
     BuildContext context,
+    AppState state,
     ({int dbBytes, int modelBytes}) stats,
   ) {
     final label = CupertinoColors.label.resolveFrom(context);
@@ -282,11 +283,16 @@ class SettingsPage extends StatelessWidget {
       ),
     );
     return IosSection(
-      header: '04 / STORAGE',
+      header: '05 / STORAGE',
+      footer: '长按「聊天数据 DB」删除全部会话与记忆（不可恢复）。',
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
-          row('聊天数据 DB', formatBytes(stats.dbBytes)),
+          GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onLongPress: () => _confirmDeleteDb(context, state),
+            child: row('聊天数据 DB', formatBytes(stats.dbBytes)),
+          ),
           const Divider(height: 1),
           row('模型文件', formatBytes(stats.modelBytes)),
         ],
@@ -294,52 +300,121 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Widget _clearButton(BuildContext context, AppState state) {
+  /// 采样参数：温度三档即时生效；思考开关要重载模型。
+  Widget _samplingSection(BuildContext context, AppState state) {
+    final s = state.settings;
+    final label = CupertinoColors.label.resolveFrom(context);
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final p = paperOf(context);
+    // 三档就近取整：0.4 稳定 / 0.7 平衡 / 1.0 活跃。
+    final tier = s.temperature <= 0.45
+        ? 'steady'
+        : s.temperature >= 0.75
+        ? 'lively'
+        : 'balanced';
     return IosSection(
-      contentPadding: EdgeInsets.zero,
-      child: CupertinoButton(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        onPressed: () => _confirmClear(context, state),
-        child: SizedBox(
-          width: double.infinity,
-          child: Text(
-            '清空聊天数据（二次确认）',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: kFontBody,
-              color: CupertinoColors.systemRed.resolveFrom(context),
+      header: '04 / SAMPLING',
+      footer: '温度低更稳、少跑题；高了更容易语无伦次。思考打开后回答更稳，但首字明显变慢，切换会重载模型。',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '随机性（temperature）',
+            style: TextStyle(fontSize: kFontBody, color: label),
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: CupertinoSlidingSegmentedControl<String>(
+              groupValue: tier,
+              children: const {
+                'steady': Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text('稳定', style: TextStyle(fontSize: kFontBody)),
+                ),
+                'balanced': Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text('平衡', style: TextStyle(fontSize: kFontBody)),
+                ),
+                'lively': Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text('活跃', style: TextStyle(fontSize: kFontBody)),
+                ),
+              },
+              onValueChanged: (v) {
+                if (v == null) return;
+                final t = v == 'steady'
+                    ? 0.35
+                    : v == 'lively'
+                    ? 0.9
+                    : 0.6;
+                state.updateTemperature(t);
+              },
             ),
           ),
-        ),
+          const SizedBox(height: 6),
+          Text(
+            '当前 ${s.temperature.toStringAsFixed(1)}',
+            style: TextStyle(fontSize: kFontCaption, color: secondary),
+          ),
+          const Divider(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '思考（慢但更稳）',
+                      style: TextStyle(fontSize: kFontBody, color: label),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      s.enableThinking ? '已开启：回答更稳，等待更久' : '已关闭：先开口再说，速度优先',
+                      style: TextStyle(
+                        fontSize: kFontCaption,
+                        color: secondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              CupertinoSwitch(
+                value: s.enableThinking,
+                activeTrackColor: p.ink,
+                onChanged: (v) => state.updateThinking(v),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  /// US-10：二次确认后才清空。
-  Future<void> _confirmClear(BuildContext context, AppState state) async {
-    final first = await showIosConfirm(
+  /// 长按数据库才弹删除：一次确认，写清不可恢复。
+  Future<void> _confirmDeleteDb(BuildContext context, AppState state) async {
+    final ok = await showIosConfirm(
       context: context,
-      title: '清空聊天数据',
-      message: '将删除全部会话记录。模型文件保留。',
-      confirmLabel: '继续',
-    );
-    if (!first || !context.mounted) return;
-    final second = await showIosConfirm(
-      context: context,
-      title: '再次确认',
-      message: '此操作不可恢复。还会删除全部记忆，确定继续？',
-      confirmLabel: '清空',
+      title: '删除聊天数据',
+      message: '会话记录与记忆会一起删除，模型文件保留。此操作不可恢复。',
+      confirmLabel: '删除',
       destructive: true,
     );
-    if (second) {
-      try {
-        await state.clearAllData();
-      } catch (e) {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context)
-              .showSnackBar(SnackBar(content: Text('清空失败: $e')));
-        }
+    if (!ok || !context.mounted) return;
+    try {
+      await state.clearAllData();
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
       }
+      return;
+    }
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('已删除聊天数据')));
     }
   }
 }

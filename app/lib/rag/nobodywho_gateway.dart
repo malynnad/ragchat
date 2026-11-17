@@ -15,6 +15,8 @@ class NobodyWhoGateway implements ModelGateway {
     this.embedModelPath,
     this.useGpu = false, // ADR-0005：本机 Adreno 上 CPU 全面优于 Vulkan
     this.contextSize = 8192,
+    this.temperature = 0.7,
+    this.enableThinking = false,
     this.onLoadProgress,
   });
 
@@ -28,6 +30,12 @@ class NobodyWhoGateway implements ModelGateway {
   final String? embedModelPath;
   final bool useGpu;
   final int contextSize;
+
+  /// 采样温度（0=几乎固定，1.5=很发散）。手机上聊天常用 0.5–0.9。
+  final double temperature;
+
+  /// Qwen3 系的思考开关；开着更稳但首字明显变慢。
+  final bool enableThinking;
   final void Function(String stage)? onLoadProgress;
 
   nw.Chat? _chat;
@@ -67,7 +75,8 @@ class NobodyWhoGateway implements ModelGateway {
       contextSize: contextSize,
       useGpu: useGpu,
       // 官方推荐关思考的方式（setAllowThinking 已 deprecated）
-      templateVariables: const {'enable_thinking': false},
+      templateVariables: {'enable_thinking': enableThinking},
+      sampler: nw.SamplerPresets.temperature(temperature: temperature),
       systemPrompt: systemPrompt,
       // ADR-0006：上下文满时报错而非静默遗忘旧轮；
       // 容量由 Dart 侧预算预检 + 提示开启新对话管理。
@@ -111,6 +120,14 @@ class NobodyWhoGateway implements ModelGateway {
         },
     ];
     yield* _chat!.complete(nwMessages);
+  }
+
+  /// 热调温度：不重载模型，下一次生成即用新采样器。
+  Future<void> setTemperature(double value) async {
+    await _ensureChat();
+    await _chat!.setSamplerConfig(
+      nw.SamplerPresets.temperature(temperature: value),
+    );
   }
 
   @override
