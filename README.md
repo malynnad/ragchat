@@ -5,9 +5,9 @@
 界面按「纸页与档案」设计语言做成一本摊开的档案册——暖白纸面、编号与细线、克制的玻璃。  
 技术栈 Flutter + [nobodywho](https://pub.dev/packages/nobodywho)（llama.cpp 的 Flutter 绑定），默认模型 Qwen3.5-2B Q4_K_M。
 
-| 记忆 | 设置 |
-| --- | --- |
-| ![记忆](docs/screenshots/memory.png) | ![设置](docs/screenshots/settings.png) |
+| 聊天 | 记忆 | 设置 |
+| --- | --- | --- |
+| ![聊天](docs/screenshots/chat.png) | ![记忆](docs/screenshots/memory.png) | ![设置](docs/screenshots/settings.png) |
 
 ## 目录
 
