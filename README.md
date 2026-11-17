@@ -5,9 +5,9 @@
 界面按「纸页与档案」设计语言做成一本摊开的档案册——暖白纸面、编号与细线、克制的玻璃。  
 技术栈 Flutter + [nobodywho](https://pub.dev/packages/nobodywho)（llama.cpp 的 Flutter 绑定），默认模型 Qwen3.5-2B Q4_K_M。
 
-| 聊天 | 记忆 | 设置 |
-| --- | --- | --- |
-| ![聊天](docs/screenshots/chat.png) | ![记忆](docs/screenshots/memory.png) | ![设置](docs/screenshots/settings.png) |
+| 记忆 | 设置 |
+| --- | --- |
+| ![记忆](docs/screenshots/memory.png) | ![设置](docs/screenshots/settings.png) |
 
 ## 目录
 
@@ -73,8 +73,6 @@ adb install -r build/app/outputs/flutter-apk/app-release.apk
 1. 进模型准备页，从「下载候选模型」里挑一个下载（会显示进度），或者用「导入本地文件」选手机里的 GGUF
 2. 确认聊天模型后进主页；嵌入模型可选，只有 v2 情景记忆才用得上
 3. 点左上 `new` 开始对话
-
-![开机动画](docs/screenshots/splash.png)
 
 ## 模型怎么选
 
