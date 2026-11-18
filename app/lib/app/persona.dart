@@ -112,27 +112,35 @@ class PersonaCard {
       jsonEncode([for (final c in cards) c.toJson()]);
 
   static List<PersonaCard> decodeList(String? json) {
-    if (json == null || json.isEmpty) return List.of(builtinPersonas);
+    if (json == null || json.isEmpty) return defaultPersonaSlots();
     try {
       final list = jsonDecode(json) as List;
       final cards = [
         for (final e in list) PersonaCard.fromJson(e as Map<String, dynamic>),
       ];
-      return cards.isEmpty ? List.of(builtinPersonas) : cards;
+      return cards.isEmpty ? defaultPersonaSlots() : cards;
     } catch (_) {
-      return List.of(builtinPersonas);
+      return defaultPersonaSlots();
     }
   }
 }
 
-/// 内置预设：小暖 / 小助 / 阿博是短人设（本地用），傲娇鱼是长人设（云端用）。
-/// 第一张「大肥鱼」是默认人设（社区「傲娇鱼」精简版，原文 2,308 字压到 43 字性格）。
-const List<PersonaCard> builtinPersonas = [
-  // 长人设（约 2.3k 字）：只在云端后端下合适，本地 800 token 装不下。
-  PersonaCard(
-    id: 'dafeiyu',
-    name: '傲娇鱼',
-    text: r'''# 人设：傲娇鱼（大肥鱼）
+/// 两张人设槽位：本地模型用「小暖」，云端 API 用「傲娇鱼」。
+/// id 固定为 `local` / `cloud`——名字可以改，槽位不变，改完切后端也不会被覆盖。
+const PersonaCard localPersonaDefault = PersonaCard(
+  id: 'local',
+  name: '小暖',
+  personality: '温和、爱笑，先接住情绪，不急着给建议',
+  style: '口语，短句，一两句就停，不列点、不总结',
+  catchphrase: '嗯，我在；那你慢慢说',
+  addressTerm: '你',
+);
+
+/// 长人设（2.3k 字）：只在云端后端用，本地 800 token 装不下。
+const PersonaCard cloudPersonaDefault = PersonaCard(
+  id: 'cloud',
+  name: '傲娇鱼',
+  text: r'''# 人设：傲娇鱼（大肥鱼）
 
 > 改编自社区人设「傲娇鱼」（原作者 AA王总，原载 kondius.cn 的 Agent 人设市场：https://www.kondius.cn/qq-agent/plugin-market/ ）。本版按 DSH 的使用场景改写：去掉聊天软件特有的场景设定（连发、群聊、管理员），补上干活与底线两节。
 
@@ -219,29 +227,15 @@ DSH 里你不是摆设，正事得办得干净。
 ## 最后一条
 
 先像个人，再像条鱼。娇是底色，傲只是调味——为了卖萌把话说得不像人，或者为了嘴硬把正事搞砸，都算失败。''',
-  ),
-  PersonaCard(
-    id: 'companion',
-    name: '小暖',
-    personality: '温和、爱笑，先接住情绪，不急着给建议',
-    style: '口语，短句，一两句就停，不列点、不总结',
-    catchphrase: '嗯，我在；那你慢慢说',
-    addressTerm: '你',
-  ),
-  PersonaCard(
-    id: 'assistant',
-    name: '小助',
-    personality: '干脆、务实，不说客套话',
-    style: '先给结论，能一句就不写两句；要步骤才分点',
-    catchphrase: '行；这就来',
-    addressTerm: '你',
-  ),
-  PersonaCard(
-    id: 'tutor',
-    name: '阿博',
-    personality: '耐心、爱打比方，把事讲明白为乐',
-    style: '先结论再原因，多用生活里的例子，少术语',
-    catchphrase: '这么说吧；比如',
-    addressTerm: '你',
-  ),
+);
+
+/// 按后端取默认槽位。
+PersonaCard personaSlotDefault(String backend) =>
+    backend == 'cloud' ? cloudPersonaDefault : localPersonaDefault;
+
+/// 首次启动时的两张卡。
+List<PersonaCard> defaultPersonaSlots() => const [
+  localPersonaDefault,
+  cloudPersonaDefault,
 ];
+

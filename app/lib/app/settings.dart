@@ -12,7 +12,7 @@ class AppSettings {
     this.confirmed = false,
     this.chatModelPath,
     this.embedModelPath,
-    this.activePersonaId = 'companion',
+    this.activePersonaId = 'local',
     this.personasJson,
     this.accentId = 'blue',
     this.temperature = 0.6,
@@ -80,7 +80,7 @@ class AppSettings {
         activePersonaId:
             j['activePersonaId'] as String? ??
             j['personaId'] as String? ?? // v2 旧字段名兼容
-            'companion',
+            'local',
         personasJson: j['personasJson'] as String?,
         accentId: j['accentId'] as String? ?? 'blue',
         temperature: (j['temperature'] as num?)?.toDouble() ?? 0.6,
@@ -103,7 +103,7 @@ class AppSettings {
         'chatModelPath': chatModelPath,
         'embedModelPath': embedModelPath,
         'activePersonaId': activePersonaId,
-        'personasJson': personasJson ?? PersonaCard.encodeList(builtinPersonas),
+        'personasJson': personasJson ?? PersonaCard.encodeList(defaultPersonaSlots()),
         'accentId': accentId,
         'temperature': temperature,
         'skipModelSetup': skipModelSetup,

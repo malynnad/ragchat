@@ -96,6 +96,7 @@ class AppState extends ChangeNotifier {
     _supportDir = (await getApplicationSupportDirectory()).path;
     settings = await AppSettings.load(_supportDir);
     cloudApiKey = await secretStore.read(cloudKeyName) ?? '';
+    await normalizePersonaSlots();
     _db = await AppDb.openFile(p.join(_supportDir, 'rag.db'));
     final ext = await getExternalStorageDirectory();
     modelsDirPath = p.join(ext!.path, 'models');
@@ -172,28 +173,96 @@ class AppState extends ChangeNotifier {
     return n;
   }
 
-  // ---- 人设（US-22；2026-11-16 收敛为单卡）----
+  // ---- 人设（ADR-0014：本地 / 云端两个槽位）----
 
-  /// 当前人设（唯一一张；旧数据多张时取激活那张）。
-  PersonaCard activePersonaCard() =>
-      settings.activePersona(settings.personas());
+  /// 当前后端对应的人设卡；槽位缺失时回落到默认。
+  PersonaCard activePersonaCard() {
+    final want = settings.backend == 'cloud' ? 'cloud' : 'local';
+    return settings
+            .personas()
+            .where((c) => c.id == want)
+            .firstOrNull ??
+        personaSlotDefault(settings.backend);
+  }
 
-  /// 保存唯一的人设：正文 + 名字落盘，下一轮 system 立即用新文本。
-  /// 列表里只留这一张，旧的其它卡一并收掉。
+  /// 保存当前槽位：只替换这一张，另一张原样保留，切后端不会互相覆盖。
   Future<void> savePersona(PersonaCard card) async {
-    settings.activePersonaId = card.id;
-    settings.personasJson = PersonaCard.encodeList([card]);
+    final cards = [...settings.personas()];
+    final id = card.id.isEmpty ? settings.backend : card.id;
+    final fixed = card.id == id ? card : card;
+    final i = cards.indexWhere((c) => c.id == id);
+    if (i >= 0) {
+      cards[i] = fixed;
+    } else {
+      cards.add(fixed);
+    }
+    // 保证两张槽位都在，避免旧数据只有一张。
+    for (final backend in ['local', 'cloud']) {
+      if (!cards.any((c) => c.id == backend)) {
+        cards.add(personaSlotDefault(backend));
+      }
+    }
+    settings.personasJson = PersonaCard.encodeList(cards);
+    settings.activePersonaId = settings.backend;
     await settings.save(_supportDir);
     notifyListeners();
   }
 
-  /// 恢复内置预设（按 id 找，找不到回第一张）。
-  Future<void> resetPersona([String id = 'companion']) async {
-    final builtin = builtinPersonas.firstWhere(
-      (c) => c.id == id,
-      orElse: () => builtinPersonas.first,
-    );
-    await savePersona(builtin);
+  /// 把当前槽位恢复成默认（本地小暖 / 云端傲娇鱼）。
+  Future<void> resetPersona() async {
+    await savePersona(personaSlotDefault(settings.backend));
+  }
+
+  /// 旧数据迁移：单卡 / 预设 id（companion、dafeiyu）→ local / cloud 两个槽位。
+  Future<void> normalizePersonaSlots() async {
+    final raw = [...settings.personas()];
+    final hasLocal = raw.any((c) => c.id == 'local');
+    final hasCloud = raw.any((c) => c.id == 'cloud');
+    if (hasLocal && hasCloud && raw.length == 2) return;
+
+    PersonaCard? legacyLocal;
+    PersonaCard? legacyCloud;
+    for (final c in raw) {
+      if (c.id == 'local') legacyLocal = c;
+      if (c.id == 'cloud') legacyCloud = c;
+      // 旧版本：短卡（无正文）当本地，长卡（有正文）当云端。
+      if (c.id != 'local' && c.id != 'cloud') {
+        if (c.text.trim().isEmpty) {
+          legacyLocal ??= c;
+        } else {
+          legacyCloud ??= c;
+        }
+      }
+    }
+    final local = legacyLocal == null
+        ? localPersonaDefault
+        : legacyLocal.copyWith(name: legacyLocal.name);
+    final cloud = legacyCloud ?? cloudPersonaDefault;
+    settings.personasJson = PersonaCard.encodeList([
+      PersonaCard(
+        id: 'local',
+        name: local.name,
+        personality: local.personality,
+        style: local.style,
+        catchphrase: local.catchphrase,
+        addressTerm: local.addressTerm,
+        boundary: local.boundary,
+        text: local.text,
+      ),
+      PersonaCard(
+        id: 'cloud',
+        name: cloud.name,
+        personality: cloud.personality,
+        style: cloud.style,
+        catchphrase: cloud.catchphrase,
+        addressTerm: cloud.addressTerm,
+        boundary: cloud.boundary,
+        text: cloud.text,
+      ),
+    ]);
+    settings.activePersonaId = settings.backend;
+    await settings.save(_supportDir);
+    notifyListeners();
   }
 
   /// system 消息文本：人设卡 + 核心记忆（预算内截断），每轮重建。
@@ -471,34 +540,14 @@ class AppState extends ChangeNotifier {
     }
   }
 
-  /// 切换对话后端：本地 GGUF / 云端 API。会重建 ChatService。
-  /// 顺带换人设：本地用短人设「小暖」，云端用长人设「傲娇鱼」；
-  /// 用户自己改过的卡不动，免得悄悄覆盖。
+  /// 切换对话后端：本地 GGUF / 云端 API。人设按槽位自动跟着换，
+  /// 但**两张卡的内容都不会被覆盖**——本地的改动留在本地那张，云端同理。
   Future<void> setBackend(String backend) async {
     settings.backend = backend;
-    final preset = builtinPersonas.firstWhere(
-      (c) => c.id == (backend == 'cloud' ? 'dafeiyu' : 'companion'),
-    );
-    if (_isUntouchedPreset(activePersonaCard())) {
-      settings.activePersonaId = preset.id;
-      settings.personasJson = PersonaCard.encodeList([preset]);
-    }
+    settings.activePersonaId = backend;
     await settings.save(_supportDir);
     notifyListeners();
     await reloadModels();
-  }
-
-  /// 当前卡是不是原样预设（没被改过）；只有这种才随后端自动切换。
-  bool _isUntouchedPreset(PersonaCard card) {
-    final preset = builtinPersonas.where((c) => c.id == card.id).firstOrNull;
-    if (preset == null) return false;
-    return card.name == preset.name &&
-        card.text == preset.text &&
-        card.personality == preset.personality &&
-        card.style == preset.style &&
-        card.catchphrase == preset.catchphrase &&
-        card.addressTerm == preset.addressTerm &&
-        card.boundary == preset.boundary;
   }
 
   /// 保存云端 API key（Keychain/Keystore），并按需重建连接。

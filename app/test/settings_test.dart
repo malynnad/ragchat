@@ -62,7 +62,7 @@ void main() {
     test('decodeList：null/坏 JSON 回退内置预设', () {
       expect(
         PersonaCard.decodeList(null).map((c) => c.id),
-        builtinPersonas.map((c) => c.id),
+        defaultPersonaSlots().map((c) => c.id),
       );
       expect(PersonaCard.decodeList('{坏掉的'), isNotEmpty);
     });
@@ -138,8 +138,8 @@ void main() {
     test('缺失/损坏回退默认：personas 回内置预设', () async {
       final dir = await tmpDir();
       final missing = await AppSettings.load(dir);
-      expect(missing.personas().length, builtinPersonas.length);
-      expect(missing.activePersona(missing.personas()).id, 'companion');
+      expect(missing.personas().length, defaultPersonaSlots().length);
+      expect(missing.activePersona(missing.personas()).id, 'local');
 
       await File('$dir/settings.json').writeAsString('{坏掉的');
       final broken = await AppSettings.load(dir);

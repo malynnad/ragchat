@@ -80,24 +80,38 @@ void main() {
     expect(state.entered, isTrue);
   });
 
-  test('切后端自动换人设：云端长文、本地短卡，自改过的不动', () async {
-    final dir = await Directory.systemTemp.createTemp('ragchat-backend');
+  test('两个槽位：切后端用各自的卡，改过的名字两边都留得住', () async {
+    final dir = await Directory.systemTemp.createTemp('ragchat-slots');
     addTearDown(() => dir.delete(recursive: true));
     final state = AppState();
     state.debugSupportDir = dir.path;
+    await state.normalizePersonaSlots();
 
+    expect(state.activePersonaCard().name, '小暖', reason: '本地默认');
+
+    // 改云端那张的名字与正文：切走再切回，改动不能丢。
     await state.setBackend('cloud');
     expect(state.activePersonaCard().name, '傲娇鱼');
-    expect(state.activePersonaCard().text.length, greaterThan(1500));
+    await state.savePersona(
+      state.activePersonaCard().copyWith(name: '我的傲娇鱼'),
+    );
 
     await state.setBackend('local');
     expect(state.activePersonaCard().name, '小暖');
+    await state.savePersona(
+      state.activePersonaCard().copyWith(name: '我的小暖'),
+    );
 
-    // 用户改过的卡：切后端时不能被预设覆盖。
-    final mine = state.activePersonaCard().copyWith(name: '我的小暖', style: '超短');
-    await state.savePersona(mine);
     await state.setBackend('cloud');
+    expect(state.activePersonaCard().name, '我的傲娇鱼');
+    await state.setBackend('local');
     expect(state.activePersonaCard().name, '我的小暖');
+
+    // 恢复默认只影响当前槽位。
+    await state.resetPersona();
+    expect(state.activePersonaCard().name, '小暖');
+    await state.setBackend('cloud');
+    expect(state.activePersonaCard().name, '我的傲娇鱼');
   });
 
   test('人设：单卡编辑即落盘，system 用新正文，可恢复默认', () async {
@@ -116,12 +130,13 @@ void main() {
     expect(state.systemPrompt(), contains('你是阿鱼'));
     expect(state.systemPrompt(), contains('性格：话少，爱吃白饭'));
 
-    // 落盘只有一张，正文就是刚写的那段。
+    // 落盘两张槽位，改的是本地那张；云端那张保留默认。
     final reloaded = await AppSettings.load(dir.path);
-    expect(reloaded.personas().length, 1);
-    expect(reloaded.personas().single.name, '阿鱼');
-    expect(reloaded.personas().single.personality, '话少，爱吃白饭');
-    expect(reloaded.activePersonaId, base.id);
+    expect(reloaded.personas().length, 2);
+    final local = reloaded.personas().firstWhere((c) => c.id == 'local');
+    expect(local.name, '阿鱼');
+    expect(local.personality, '话少，爱吃白饭');
+    expect(reloaded.activePersonaId, 'local');
 
     await state.resetPersona();
     expect(state.activePersonaCard().name, '小暖');

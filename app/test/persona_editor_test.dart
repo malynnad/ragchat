@@ -112,31 +112,10 @@ void main() {
     expect(find.text('先给它起个名字'), findsOneWidget);
   });
 
-  testWidgets('点内置样板把人设换成那一段', (tester) async {
-    tallScreen(tester);
-    PersonaCard? saved;
-    await tester.pumpWidget(
-      host(
-        (ctx) async => saved = await showPersonaEditor(ctx, initial: base),
-      ),
-    );
-    await tester.tap(find.text('打开'));
-    await tester.pumpAndSettle();
-
-    await tester.tap(find.byKey(const ValueKey('persona-preset-tutor')));
-    await tester.pump();
-    await tester.tap(find.text('保存'));
-    await tester.pumpAndSettle();
-
-    final tutor = builtinPersonas.firstWhere((c) => c.id == 'tutor');
-    expect(saved!.name, tutor.name);
-    expect(saved!.render(), tutor.render());
-  });
-
   testWidgets('长人设走整段文本编辑', (tester) async {
     tallScreen(tester);
     PersonaCard? saved;
-    final long = builtinPersonas.firstWhere((c) => c.id == 'dafeiyu');
+    final long = cloudPersonaDefault;
     await tester.pumpWidget(
       host(
         (ctx) async => saved = await showPersonaEditor(ctx, initial: long),
@@ -154,7 +133,7 @@ void main() {
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
 
-    expect(saved!.id, 'dafeiyu');
+    expect(saved!.id, 'cloud');
     expect(saved!.text, contains('额外一句'));
     expect(saved!.render(), contains('额外一句'));
   });

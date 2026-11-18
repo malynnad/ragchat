@@ -66,7 +66,7 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
   ];
 
   /// 长人设（傲娇鱼）走整段文本模式；短人设走六字段模式。
-  late bool _useRaw = _base.text.trim().isNotEmpty;
+  late final bool _useRaw = _base.text.trim().isNotEmpty;
   late final _raw = TextEditingController(text: _base.text);
 
   @override
@@ -111,19 +111,6 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
       return;
     }
     Navigator.of(context).pop(_draft);
-  }
-
-  void _useBuiltin(PersonaCard card) {
-    setState(() {
-      _useRaw = card.text.trim().isNotEmpty;
-      _raw.text = card.text;
-      _ctrls[0].text = card.name;
-      _ctrls[1].text = card.personality;
-      _ctrls[2].text = card.style;
-      _ctrls[3].text = card.catchphrase;
-      _ctrls[4].text = card.addressTerm;
-      _ctrls[5].text = card.boundary;
-    });
   }
 
   @override
@@ -178,34 +165,6 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
             child: Text(
               _draft.render().isEmpty ? '（空）' : _draft.render(),
               style: TextStyle(fontSize: kFontBody, color: secondary),
-            ),
-          ),
-          const SizedBox(height: 16),
-          IosSection(
-            header: '内置样板',
-            footer: '写法的差别在口癖：换一张，语气就不一样。',
-            child: Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                for (final b in builtinPersonas)
-                  CupertinoButton(
-                    key: ValueKey('persona-preset-${b.id}'),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    minimumSize: Size.zero,
-                    color: CupertinoColors.tertiarySystemFill.resolveFrom(
-                      context,
-                    ),
-                    onPressed: () => _useBuiltin(b),
-                    child: Text(
-                      b.name,
-                      style: TextStyle(fontSize: kFontCaption),
-                    ),
-                  ),
-              ],
             ),
           ),
         ],

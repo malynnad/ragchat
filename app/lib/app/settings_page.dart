@@ -828,10 +828,15 @@ class _CatalogSectionState extends State<_CatalogSection> {
   }
 }
 
-/// 人设（单卡）：显示当前这张、进编辑器改正文、可恢复内置预设。
-/// 改完写进 settings.json，下一轮 system 消息立即用新文本。
+/// 人设：本地 / 云端两个槽位，各自可编辑；切换后端只是换用对应那张。
+/// 点槽位 = 切到那个后端，不是「恢复预设」；改名会跟着显示在槽位上。
 class _PersonaSection extends StatelessWidget {
   const _PersonaSection();
+
+  static const _slots = [
+    ('local', '本地模型'),
+    ('cloud', '云端 API'),
+  ];
 
   Future<void> _edit(
     BuildContext context,
@@ -844,11 +849,12 @@ class _PersonaSection extends StatelessWidget {
   }
 
   Future<void> _reset(BuildContext context, AppState state) async {
+    final name = personaSlotDefault(state.settings.backend).name;
     final ok = await showIosConfirm(
       context: context,
-      title: '恢复默认人设',
-      message: '现在写的这段会被内置「${builtinPersonas.first.name}」替换，回不来。',
-      confirmLabel: '替换',
+      title: '恢复这一张',
+      message: '当前槽位会变回内置「$name」，你写的内容会丢。',
+      confirmLabel: '恢复',
       destructive: true,
     );
     if (ok) await state.resetPersona();
@@ -857,108 +863,112 @@ class _PersonaSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final card = state.activePersonaCard();
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    final label = CupertinoColors.label.resolveFrom(context);
-    final used = estimateTokens(card.render());
+    final cards = state.settings.personas();
+    final active = state.activePersonaCard();
+    final p = paperOf(context);
+    final secondary = p.muted;
+
+    PersonaCard cardFor(String id) =>
+        cards.where((c) => c.id == id).firstOrNull ??
+        personaSlotDefault(id);
+
     return IosSection(
       header: '03 / PERSONA',
       footer:
-          '只有这一张，和长期记忆共用 system 预算（本地 800 / 云端 6000 token）。'
-          '短人设给本地，长人设「傲娇鱼」只在云端合适；切换后端会自动换预设。',
+          '只有两张：本地用短人设，云端用长人设。点一行会把对话切到那个后端，'
+          '内容各自保存、互不覆盖；改名也会跟着显示。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      card.name.isEmpty ? '未命名' : card.name,
-                      style: TextStyle(fontSize: kFontBody, color: label),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      card.text.trim().isNotEmpty
-                          ? '≈ $used token · 长人设（云端合适，本地会被截断）'
-                          : '≈ $used token',
-                      style: TextStyle(
-                        fontSize: kFontCaption,
-                        color:
-                            card.text.trim().isEmpty &&
-                                used > personaSoftBudgetTokens
-                            ? CupertinoColors.systemRed.resolveFrom(context)
-                            : secondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              CupertinoButton(
-                key: const ValueKey('persona-edit'),
-                padding: const EdgeInsets.symmetric(horizontal: 8),
-                minimumSize: Size.zero,
-                onPressed: () => _edit(context, state, card),
-                child: const Text('编辑', style: TextStyle(fontSize: kFontBody)),
-              ),
-            ],
-          ),
+          for (var i = 0; i < _slots.length; i++) ...[
+            if (i > 0) const Divider(height: 14),
+            _slotRow(
+              context: context,
+              state: state,
+              id: _slots[i].$1,
+              label: _slots[i].$2,
+              card: cardFor(_slots[i].$1),
+              isActive: state.settings.backend == _slots[i].$1,
+            ),
+          ],
           const SizedBox(height: 6),
           Text(
-            card.render(),
-            maxLines: 4,
+            active.render(),
+            maxLines: 3,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(fontSize: kFontCaption, color: secondary),
           ),
           const Divider(height: 16),
-          Text('预设', style: TextStyle(fontSize: kFontCode, color: secondary)),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final preset in builtinPersonas)
-                CupertinoButton(
-                  key: ValueKey('persona-preset-${preset.id}'),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  minimumSize: Size.zero,
-                  color: preset.id == card.id
-                      ? paperOf(context).ink
-                      : CupertinoColors.tertiarySystemFill.resolveFrom(
-                          context,
-                        ),
-                  onPressed: () => state.savePersona(preset),
-                  child: Text(
-                    preset.name,
-                    style: TextStyle(
-                      fontSize: kFontCaption,
-                      color: preset.id == card.id
-                          ? paperOf(context).milk
-                          : paperOf(context).ink,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
           Row(
             children: [
               CupertinoButton(
                 key: const ValueKey('persona-reset'),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 8,
+                  vertical: 6,
+                ),
                 minimumSize: Size.zero,
                 onPressed: () => _reset(context, state),
                 child: const Text(
-                  '恢复默认',
+                  '恢复这一张',
                   style: TextStyle(fontSize: kFontBody),
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _slotRow({
+    required BuildContext context,
+    required AppState state,
+    required String id,
+    required String label,
+    required PersonaCard card,
+    required bool isActive,
+  }) {
+    final p = paperOf(context);
+    final used = estimateTokens(card.render());
+    return CupertinoButton(
+      key: ValueKey('persona-slot-$id'),
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      minimumSize: Size.zero,
+      onPressed: () => state.setBackend(id),
+      child: Row(
+        children: [
+          Icon(
+            isActive
+                ? CupertinoIcons.checkmark_circle_fill
+                : CupertinoIcons.circle,
+            size: 18,
+            color: isActive ? p.ink : p.muted,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(fontSize: kFontCode, color: p.muted),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '${card.name.isEmpty ? '未命名' : card.name}'
+                  ' · ≈$used token',
+                  style: TextStyle(fontSize: kFontBody, color: p.ink),
+                ),
+              ],
+            ),
+          ),
+          CupertinoButton(
+            key: ValueKey('persona-edit-$id'),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            minimumSize: Size.zero,
+            onPressed: () => _edit(context, state, card),
+            child: const Text('编辑', style: TextStyle(fontSize: kFontBody)),
           ),
         ],
       ),
