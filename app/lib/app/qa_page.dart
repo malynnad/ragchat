@@ -109,7 +109,10 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
     if (q.isEmpty || _busy) return;
     final state = AppStateScope.of(context);
     // 还没配模型：给个说明，别让 ensureChat 里 settings.chatModelPath! 崩掉。
-    if (state.settings.chatModelPath == null) {
+    // 云端后端只要能拿到 key，就不需要本地模型。
+    final cloudReady =
+        state.settings.backend == 'cloud' && state.cloudApiKey.isNotEmpty;
+    if (!cloudReady && state.settings.chatModelPath == null) {
       await showIosAlert(
         context: context,
         title: '还没有聊天模型',

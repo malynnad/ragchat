@@ -65,7 +65,10 @@ class _IosShellState extends State<IosShell> {
                 bottom: false,
                 child: Column(
                   children: [
-                    if (!state.modelsReady)
+                    // 走云端且已填 key 时，没有本地模型不算「缺配置」。
+                    if (state.settings.backend == 'local'
+                        ? !state.modelsReady
+                        : state.cloudApiKey.isEmpty)
                       _Banner(
                         child: Row(
                           children: [
