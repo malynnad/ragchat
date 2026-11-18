@@ -115,7 +115,9 @@ x86_64 与 armeabi-v7a 包只给模拟器 / 老设备用，普通手机装 arm64
 
 切换在设置 → `05 / BACKEND`：选「云端 API」后填 Base URL、模型名、API key，点「测试连接」会走 `GET /models` 自检（不发对话、不烧 token）。没填 key 时聊天自动继续走本地。
 
-Base URL 默认 `https://api.deepseek.com`，模型名 `deepseek-chat`；用中转就换成对方地址，末尾带不带 `/` 都行。
+模型名默认 `deepseek-flash`（便宜快）；想更稳更强改成 `deepseek-v4-pro`。切换后端会顺带换人设：本地 → 小暖，云端 → 傲娇鱼。
+
+Base URL 默认 `https://api.deepseek.com`；用中转就换成对方地址，末尾带不带 `/` 都行。
 
 ## 隐私
 

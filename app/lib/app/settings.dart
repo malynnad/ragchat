@@ -12,14 +12,14 @@ class AppSettings {
     this.confirmed = false,
     this.chatModelPath,
     this.embedModelPath,
-    this.activePersonaId = 'dafeiyu',
+    this.activePersonaId = 'companion',
     this.personasJson,
     this.accentId = 'blue',
     this.temperature = 0.6,
     this.skipModelSetup = false,
     this.backend = 'local',
     this.cloudBaseUrl = 'https://api.deepseek.com',
-    this.cloudModel = 'deepseek-chat',
+    this.cloudModel = 'deepseek-flash',
   });
 
   /// ADR-0005：默认 CPU；GPU 仅作开关
@@ -55,7 +55,7 @@ class AppSettings {
   /// 云端 baseURL；填到 /v1 也行，网关会自动补 /chat/completions。
   String cloudBaseUrl;
 
-  /// 云端模型名，DeepSeek 官方是 deepseek-chat。
+  /// 云端模型名：deepseek-flash（便宜快）或 deepseek-v4-pro（更强）。
   String cloudModel;
 
   /// 当前人设卡（列表里找不到 activePersonaId 时回退第一张）。
@@ -80,7 +80,7 @@ class AppSettings {
         activePersonaId:
             j['activePersonaId'] as String? ??
             j['personaId'] as String? ?? // v2 旧字段名兼容
-            'dafeiyu',
+            'companion',
         personasJson: j['personasJson'] as String?,
         accentId: j['accentId'] as String? ?? 'blue',
         temperature: (j['temperature'] as num?)?.toDouble() ?? 0.6,
@@ -88,7 +88,7 @@ class AppSettings {
         backend: j['backend'] as String? ?? 'local',
         cloudBaseUrl:
             j['cloudBaseUrl'] as String? ?? 'https://api.deepseek.com',
-        cloudModel: j['cloudModel'] as String? ?? 'deepseek-chat',
+        cloudModel: j['cloudModel'] as String? ?? 'deepseek-flash',
       );
     } catch (_) {
       return AppSettings();

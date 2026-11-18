@@ -864,7 +864,8 @@ class _PersonaSection extends StatelessWidget {
     return IosSection(
       header: '03 / PERSONA',
       footer:
-          '只有这一张，和长期记忆共用 800 token 的 system 预算（人设建议 ≤$personaSoftBudgetTokens）；改完下一轮生效。',
+          '只有这一张，和长期记忆共用 system 预算（本地 800 / 云端 6000 token）。'
+          '短人设给本地，长人设「傲娇鱼」只在云端合适；切换后端会自动换预设。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -880,10 +881,14 @@ class _PersonaSection extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '≈ $used token',
+                      card.text.trim().isNotEmpty
+                          ? '≈ $used token · 长人设（云端合适，本地会被截断）'
+                          : '≈ $used token',
                       style: TextStyle(
                         fontSize: kFontCaption,
-                        color: used > personaSoftBudgetTokens
+                        color:
+                            card.text.trim().isEmpty &&
+                                used > personaSoftBudgetTokens
                             ? CupertinoColors.systemRed.resolveFrom(context)
                             : secondary,
                       ),
@@ -908,6 +913,39 @@ class _PersonaSection extends StatelessWidget {
             style: TextStyle(fontSize: kFontCaption, color: secondary),
           ),
           const Divider(height: 16),
+          Text('预设', style: TextStyle(fontSize: kFontCode, color: secondary)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final preset in builtinPersonas)
+                CupertinoButton(
+                  key: ValueKey('persona-preset-${preset.id}'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
+                  minimumSize: Size.zero,
+                  color: preset.id == card.id
+                      ? paperOf(context).ink
+                      : CupertinoColors.tertiarySystemFill.resolveFrom(
+                          context,
+                        ),
+                  onPressed: () => state.savePersona(preset),
+                  child: Text(
+                    preset.name,
+                    style: TextStyle(
+                      fontSize: kFontCaption,
+                      color: preset.id == card.id
+                          ? paperOf(context).milk
+                          : paperOf(context).ink,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               CupertinoButton(

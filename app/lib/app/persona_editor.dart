@@ -65,12 +65,17 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
     TextEditingController(text: _base.boundary),
   ];
 
+  /// 长人设（傲娇鱼）走整段文本模式；短人设走六字段模式。
+  late bool _useRaw = _base.text.trim().isNotEmpty;
+  late final _raw = TextEditingController(text: _base.text);
+
   @override
   void initState() {
     super.initState();
     for (final c in _ctrls) {
       c.addListener(_onChanged);
     }
+    _raw.addListener(_onChanged);
   }
 
   @override
@@ -78,6 +83,7 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
     for (final c in _ctrls) {
       c.dispose();
     }
+    _raw.dispose();
     super.dispose();
   }
 
@@ -85,15 +91,17 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
 
   String _v(int i) => _ctrls[i].text.trim();
 
-  PersonaCard get _draft => PersonaCard(
-    id: _base.id,
-    name: _v(0),
-    personality: _v(1),
-    style: _v(2),
-    catchphrase: _v(3),
-    addressTerm: _v(4),
-    boundary: _v(5),
-  );
+  PersonaCard get _draft => _useRaw
+      ? PersonaCard(id: _base.id, name: _v(0), text: _raw.text.trim())
+      : PersonaCard(
+          id: _base.id,
+          name: _v(0),
+          personality: _v(1),
+          style: _v(2),
+          catchphrase: _v(3),
+          addressTerm: _v(4),
+          boundary: _v(5),
+        );
 
   void _save() {
     if (_draft.name.isEmpty) {
@@ -106,12 +114,16 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
   }
 
   void _useBuiltin(PersonaCard card) {
-    _ctrls[0].text = card.name;
-    _ctrls[1].text = card.personality;
-    _ctrls[2].text = card.style;
-    _ctrls[3].text = card.catchphrase;
-    _ctrls[4].text = card.addressTerm;
-    _ctrls[5].text = card.boundary;
+    setState(() {
+      _useRaw = card.text.trim().isNotEmpty;
+      _raw.text = card.text;
+      _ctrls[0].text = card.name;
+      _ctrls[1].text = card.personality;
+      _ctrls[2].text = card.style;
+      _ctrls[3].text = card.catchphrase;
+      _ctrls[4].text = card.addressTerm;
+      _ctrls[5].text = card.boundary;
+    });
   }
 
   @override
@@ -132,13 +144,28 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
         children: [
           IosSection(
             header: '人设卡',
-            footer: '写得越短，手机端首字出得越快。形容词两三个就够，口癖比形容词更像人。',
+            footer: _useRaw
+                ? '长人设整段塞进 system，适合云端；本地 2B/4B 会被预算截断，建议切回短人设。'
+                : '写得越短，手机端首字出得越快。形容词两三个就够，口癖比形容词更像人。',
             child: Column(
               children: [
-                for (var i = 0; i < _fields.length; i++) ...[
-                  if (i > 0) const Divider(height: 20),
-                  _field(i, secondary),
+                _field(0, secondary),
+                if (_useRaw) ...[
+                  const Divider(height: 20),
+                  CupertinoTextField(
+                    key: const ValueKey('persona-raw'),
+                    controller: _raw,
+                    minLines: 12,
+                    maxLines: 24,
+                    style: TextStyle(fontSize: kFontBody),
+                    placeholder: '整段人设（可以参考「傲娇鱼」的写法）',
+                  ),
                 ],
+                if (!_useRaw)
+                  for (var i = 1; i < _fields.length; i++) ...[
+                    const Divider(height: 20),
+                    _field(i, secondary),
+                  ],
               ],
             ),
           ),

@@ -188,7 +188,7 @@ class AppState extends ChangeNotifier {
   }
 
   /// 恢复内置预设（按 id 找，找不到回第一张）。
-  Future<void> resetPersona([String id = 'dafeiyu']) async {
+  Future<void> resetPersona([String id = 'companion']) async {
     final builtin = builtinPersonas.firstWhere(
       (c) => c.id == id,
       orElse: () => builtinPersonas.first,
@@ -197,10 +197,15 @@ class AppState extends ChangeNotifier {
   }
 
   /// system 消息文本：人设卡 + 核心记忆（预算内截断），每轮重建。
+  /// 云端上下文大得多，长人设 + 更多记忆也能装下（ADR-0013）。
   String systemPrompt() => ChatService.buildSystemPromptWithinBudget(
     activePersonaCard(),
     activeMemories(),
+    budget: settings.backend == 'cloud' ? cloudSystemBudget : systemBudgetTokens,
   );
+
+  /// 云端 system 预算：6k 足够放长人设 + 几十条记忆，离 64k 还很远。
+  static const cloudSystemBudget = 6000;
 
   /// 会话预算占用率（UI 指示器用）：无 service 时纯估算兜底。
   double contextUsage() {
@@ -467,11 +472,33 @@ class AppState extends ChangeNotifier {
   }
 
   /// 切换对话后端：本地 GGUF / 云端 API。会重建 ChatService。
+  /// 顺带换人设：本地用短人设「小暖」，云端用长人设「傲娇鱼」；
+  /// 用户自己改过的卡不动，免得悄悄覆盖。
   Future<void> setBackend(String backend) async {
     settings.backend = backend;
+    final preset = builtinPersonas.firstWhere(
+      (c) => c.id == (backend == 'cloud' ? 'dafeiyu' : 'companion'),
+    );
+    if (_isUntouchedPreset(activePersonaCard())) {
+      settings.activePersonaId = preset.id;
+      settings.personasJson = PersonaCard.encodeList([preset]);
+    }
     await settings.save(_supportDir);
     notifyListeners();
     await reloadModels();
+  }
+
+  /// 当前卡是不是原样预设（没被改过）；只有这种才随后端自动切换。
+  bool _isUntouchedPreset(PersonaCard card) {
+    final preset = builtinPersonas.where((c) => c.id == card.id).firstOrNull;
+    if (preset == null) return false;
+    return card.name == preset.name &&
+        card.text == preset.text &&
+        card.personality == preset.personality &&
+        card.style == preset.style &&
+        card.catchphrase == preset.catchphrase &&
+        card.addressTerm == preset.addressTerm &&
+        card.boundary == preset.boundary;
   }
 
   /// 保存云端 API key（Keychain/Keystore），并按需重建连接。

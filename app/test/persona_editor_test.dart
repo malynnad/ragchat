@@ -133,6 +133,32 @@ void main() {
     expect(saved!.render(), tutor.render());
   });
 
+  testWidgets('长人设走整段文本编辑', (tester) async {
+    tallScreen(tester);
+    PersonaCard? saved;
+    final long = builtinPersonas.firstWhere((c) => c.id == 'dafeiyu');
+    await tester.pumpWidget(
+      host(
+        (ctx) async => saved = await showPersonaEditor(ctx, initial: long),
+      ),
+    );
+    await tester.tap(find.text('打开'));
+    await tester.pumpAndSettle();
+
+    final raw = find.byKey(const ValueKey('persona-raw'));
+    expect(raw, findsOneWidget, reason: '长人设应显示整段编辑框');
+    expect(find.byKey(const ValueKey('persona-field-1')), findsNothing);
+
+    await tester.enterText(raw, '${long.text}\n\n额外一句：只在云端用。');
+    await tester.pump();
+    await tester.tap(find.text('保存'));
+    await tester.pumpAndSettle();
+
+    expect(saved!.id, 'dafeiyu');
+    expect(saved!.text, contains('额外一句'));
+    expect(saved!.render(), contains('额外一句'));
+  });
+
   testWidgets('取消不返回任何卡', (tester) async {
     tallScreen(tester);
     var popped = false;

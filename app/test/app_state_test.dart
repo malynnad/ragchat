@@ -80,6 +80,26 @@ void main() {
     expect(state.entered, isTrue);
   });
 
+  test('切后端自动换人设：云端长文、本地短卡，自改过的不动', () async {
+    final dir = await Directory.systemTemp.createTemp('ragchat-backend');
+    addTearDown(() => dir.delete(recursive: true));
+    final state = AppState();
+    state.debugSupportDir = dir.path;
+
+    await state.setBackend('cloud');
+    expect(state.activePersonaCard().name, '傲娇鱼');
+    expect(state.activePersonaCard().text.length, greaterThan(1500));
+
+    await state.setBackend('local');
+    expect(state.activePersonaCard().name, '小暖');
+
+    // 用户改过的卡：切后端时不能被预设覆盖。
+    final mine = state.activePersonaCard().copyWith(name: '我的小暖', style: '超短');
+    await state.savePersona(mine);
+    await state.setBackend('cloud');
+    expect(state.activePersonaCard().name, '我的小暖');
+  });
+
   test('人设：单卡编辑即落盘，system 用新正文，可恢复默认', () async {
     final dir = await Directory.systemTemp.createTemp('ragchat-persona');
     addTearDown(() => dir.delete(recursive: true));
@@ -87,7 +107,7 @@ void main() {
     state.debugSupportDir = dir.path;
 
     final base = state.activePersonaCard();
-    expect(base.name, '大肥鱼', reason: '默认内置第一张');
+    expect(base.name, '小暖', reason: '本地默认短人设');
 
     await state.savePersona(
       base.copyWith(name: '阿鱼', personality: '话少，爱吃白饭'),
@@ -104,8 +124,8 @@ void main() {
     expect(reloaded.activePersonaId, base.id);
 
     await state.resetPersona();
-    expect(state.activePersonaCard().name, '大肥鱼');
-    expect(state.activePersonaCard().catchphrase, contains('才不是'));
+    expect(state.activePersonaCard().name, '小暖');
+    expect(state.activePersonaCard().catchphrase, contains('嗯，我在'));
   });
 }
 

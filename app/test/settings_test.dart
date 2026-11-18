@@ -139,7 +139,7 @@ void main() {
       final dir = await tmpDir();
       final missing = await AppSettings.load(dir);
       expect(missing.personas().length, builtinPersonas.length);
-      expect(missing.activePersona(missing.personas()).id, 'dafeiyu');
+      expect(missing.activePersona(missing.personas()).id, 'companion');
 
       await File('$dir/settings.json').writeAsString('{坏掉的');
       final broken = await AppSettings.load(dir);
