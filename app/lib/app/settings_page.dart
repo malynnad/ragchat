@@ -39,6 +39,8 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 28),
           _samplingSection(context, state),
           const SizedBox(height: 28),
+          const _CloudSection(),
+          const SizedBox(height: 28),
           _storageSection(context, state, stats),
         ],
       ),
@@ -108,10 +110,7 @@ class SettingsPage extends StatelessWidget {
                 onPressed: () => Navigator.of(context).push(
                   CupertinoPageRoute(builder: (_) => const ModelPrepPage()),
                 ),
-                child: Text(
-                  '准备页',
-                  style: TextStyle(fontSize: kFontControl),
-                ),
+                child: Text('准备页', style: TextStyle(fontSize: kFontControl)),
               ),
               const Spacer(),
               CupertinoButton(
@@ -297,7 +296,7 @@ class SettingsPage extends StatelessWidget {
       ),
     );
     return IosSection(
-      header: '05 / STORAGE',
+      header: '06 / STORAGE',
       footer: '删除按钮要按满一格才会弹确认：按下去会从左往右变红，松手即取消。',
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
@@ -394,17 +393,218 @@ class SettingsPage extends StatelessWidget {
       await state.clearAllData();
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('删除失败: $e')));
       }
       return;
     }
     if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已删除聊天数据')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('已删除聊天数据')));
     }
+  }
+}
+
+/// 对话后端：本地 GGUF 或云端 OpenAI 兼容 API（DeepSeek 默认）。
+class _CloudSection extends StatefulWidget {
+  const _CloudSection();
+
+  @override
+  State<_CloudSection> createState() => _CloudSectionState();
+}
+
+class _CloudSectionState extends State<_CloudSection> {
+  late final _base = TextEditingController();
+  late final _model = TextEditingController();
+  late final _key = TextEditingController();
+  bool _ready = false;
+  bool _testing = false;
+  String? _status;
+  bool _statusError = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_ready) return;
+    _ready = true;
+    final s = AppStateScope.of(context).settings;
+    _base.text = s.cloudBaseUrl;
+    _model.text = s.cloudModel;
+    _key.text = AppStateScope.of(context).cloudApiKey;
+  }
+
+  @override
+  void dispose() {
+    _base.dispose();
+    _model.dispose();
+    _key.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save(AppState state) async {
+    await state.setCloudEndpoint(baseUrl: _base.text, model: _model.text);
+    await state.setCloudKey(_key.text);
+    if (!mounted) return;
+    setState(() {
+      _status = '已保存';
+      _statusError = false;
+    });
+  }
+
+  Future<void> _test(AppState state) async {
+    await _save(state);
+    setState(() {
+      _testing = true;
+      _status = '正在连接…';
+      _statusError = false;
+    });
+    try {
+      final models = await state.testCloudConnection();
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _statusError = false;
+        _status = models.isEmpty
+            ? '连接成功（没拿到模型列表）'
+            : '连接成功：${models.take(3).join(' / ')}'
+                  '${models.length > 3 ? ' …' : ''}';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _statusError = true;
+        _status = '$e';
+      });
+    }
+  }
+
+  Widget _field(String label, TextEditingController c, {bool obscure = false}) {
+    final p = paperOf(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(fontSize: kFontCode, color: p.muted),
+          ),
+          const SizedBox(height: 4),
+          Container(
+            decoration: BoxDecoration(
+              color: p.milk,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(color: p.hairline, width: 0.7),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: CupertinoTextField(
+              controller: c,
+              obscureText: obscure,
+              style: TextStyle(fontSize: kFontBody, color: p.ink),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              decoration: const BoxDecoration(),
+              placeholder: label,
+              placeholderStyle: TextStyle(fontSize: kFontBody, color: p.muted),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppStateScope.of(context);
+    final p = paperOf(context);
+    final cloud = state.settings.backend == 'cloud';
+    return IosSection(
+      header: '05 / BACKEND',
+      footer: cloud
+          ? '云端会把每轮对话、人设和记忆发给服务商；不用时切回本地。'
+          : '本地模型全程离线；想用 DeepSeek 之类的大模型再切云端。',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: double.infinity,
+            child: CupertinoSlidingSegmentedControl<String>(
+              groupValue: cloud ? 'cloud' : 'local',
+              children: const {
+                'local': Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text('本地模型', style: TextStyle(fontSize: kFontBody)),
+                ),
+                'cloud': Padding(
+                  padding: EdgeInsets.symmetric(vertical: 6),
+                  child: Text('云端 API', style: TextStyle(fontSize: kFontBody)),
+                ),
+              },
+              onValueChanged: (v) {
+                if (v == null) return;
+                state.setBackend(v);
+              },
+            ),
+          ),
+          if (cloud) ...[
+            const SizedBox(height: 14),
+            _field('Base URL', _base),
+            _field('模型名', _model),
+            _field('API key', _key, obscure: true),
+            Row(
+              children: [
+                CupertinoButton(
+                  key: const ValueKey('cloud-save'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  minimumSize: Size.zero,
+                  onPressed: () => _save(state),
+                  child: Text(
+                    '保存',
+                    style: TextStyle(fontSize: kFontBody, color: p.ink),
+                  ),
+                ),
+                CupertinoButton(
+                  key: const ValueKey('cloud-test'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
+                  ),
+                  minimumSize: Size.zero,
+                  onPressed: _testing ? null : () => _test(state),
+                  child: Text(
+                    _testing ? '测试中…' : '测试连接',
+                    style: TextStyle(fontSize: kFontBody, color: p.ink),
+                  ),
+                ),
+              ],
+            ),
+            if (_status != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  _status!,
+                  style: TextStyle(
+                    fontSize: kFontCaption,
+                    height: 1.5,
+                    color: _statusError ? const Color(0xFFB3261E) : p.muted,
+                  ),
+                ),
+              ),
+            if (state.cloudApiKey.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '还没填 key：聊天会继续走本地模型。',
+                  style: TextStyle(fontSize: kFontCode, color: p.muted),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
   }
 }
 

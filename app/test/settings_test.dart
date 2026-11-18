@@ -156,6 +156,21 @@ void main() {
       expect(AppSettings().temperature, 0.6, reason: '默认平衡档');
     });
 
+    test('云端后端字段往返', () async {
+      final dir = await tmpDir();
+      final s = AppSettings(
+        backend: 'cloud',
+        cloudBaseUrl: 'https://api.deepseek.com',
+        cloudModel: 'deepseek-chat',
+      );
+      await s.save(dir);
+      final back = await AppSettings.load(dir);
+      expect(back.backend, 'cloud');
+      expect(back.cloudBaseUrl, 'https://api.deepseek.com');
+      expect(back.cloudModel, 'deepseek-chat');
+      expect(AppSettings().backend, 'local', reason: '默认走本地');
+    });
+
     test('activePersona：激活 id 不在列表时回退第一张', () {
       final s = AppSettings(activePersonaId: 'ghost');
       final cards = [const PersonaCard(id: 'a', name: 'A')];

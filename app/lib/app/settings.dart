@@ -17,6 +17,9 @@ class AppSettings {
     this.accentId = 'blue',
     this.temperature = 0.6,
     this.skipModelSetup = false,
+    this.backend = 'local',
+    this.cloudBaseUrl = 'https://api.deepseek.com',
+    this.cloudModel = 'deepseek-chat',
   });
 
   /// ADR-0005：默认 CPU；GPU 仅作开关
@@ -46,6 +49,15 @@ class AppSettings {
   /// 用户选择「稍后配置模型」：允许没有模型也进主界面。
   bool skipModelSetup;
 
+  /// 对话后端：`local`（端上 GGUF）或 `cloud`（OpenAI 兼容 API）。
+  String backend;
+
+  /// 云端 baseURL；填到 /v1 也行，网关会自动补 /chat/completions。
+  String cloudBaseUrl;
+
+  /// 云端模型名，DeepSeek 官方是 deepseek-chat。
+  String cloudModel;
+
   /// 当前人设卡（列表里找不到 activePersonaId 时回退第一张）。
   PersonaCard activePersona(List<PersonaCard> cards) => cards.firstWhere(
     (c) => c.id == activePersonaId,
@@ -73,6 +85,10 @@ class AppSettings {
         accentId: j['accentId'] as String? ?? 'blue',
         temperature: (j['temperature'] as num?)?.toDouble() ?? 0.6,
         skipModelSetup: j['skipModelSetup'] as bool? ?? false,
+        backend: j['backend'] as String? ?? 'local',
+        cloudBaseUrl:
+            j['cloudBaseUrl'] as String? ?? 'https://api.deepseek.com',
+        cloudModel: j['cloudModel'] as String? ?? 'deepseek-chat',
       );
     } catch (_) {
       return AppSettings();
@@ -91,6 +107,9 @@ class AppSettings {
         'accentId': accentId,
         'temperature': temperature,
         'skipModelSetup': skipModelSetup,
+        'backend': backend,
+        'cloudBaseUrl': cloudBaseUrl,
+        'cloudModel': cloudModel,
       }),
     );
   }

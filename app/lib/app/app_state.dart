@@ -12,7 +12,9 @@ import '../chat/app_db.dart';
 import '../chat/chat_service.dart';
 import '../chat/memory_service.dart';
 import '../rag/models.dart';
+import '../rag/cloud_gateway.dart';
 import '../rag/nobodywho_gateway.dart';
+import '../rag/secret_store.dart';
 import '../rag/token_budget.dart';
 import 'persona.dart';
 import 'settings.dart';
@@ -52,7 +54,16 @@ class AppState extends ChangeNotifier {
   String _supportDir = '';
   AppDb? _db;
   NobodyWhoGateway? _gateway;
+  CloudGateway? _cloud;
   ChatService? _chatService;
+
+  /// API key 走系统安全存储；测试可注入 MemorySecretStore。
+  SecretStore secretStore = SecureSecretStore();
+  String cloudApiKey = '';
+  static const cloudKeyName = 'cloud_api_key';
+
+  /// 云端上下文预算（DeepSeek 是 64K，留一点余量）。
+  static const cloudContextSize = 64000;
 
   /// 当前会话（US-19 持久化）：重启恢复最近会话与轮次。
   String? currentSessionId;
@@ -78,11 +89,13 @@ class AppState extends ChangeNotifier {
   bool get entered =>
       settings.confirmed && (modelsReady || settings.skipModelSetup);
 
-  bool get gatewayLoaded => _gateway?.loaded ?? false;
+  bool get gatewayLoaded =>
+      settings.backend == 'cloud' ? _chatService != null : _gateway?.loaded ?? false;
 
   Future<void> init() async {
     _supportDir = (await getApplicationSupportDirectory()).path;
     settings = await AppSettings.load(_supportDir);
+    cloudApiKey = await secretStore.read(cloudKeyName) ?? '';
     _db = await AppDb.openFile(p.join(_supportDir, 'rag.db'));
     final ext = await getExternalStorageDirectory();
     modelsDirPath = p.join(ext!.path, 'models');
@@ -367,6 +380,20 @@ class AppState extends ChangeNotifier {
       _chatService = await debugServiceFactory!();
       return _chatService!;
     }
+    if (settings.backend == 'cloud' && cloudApiKey.isNotEmpty) {
+      final cloud = CloudGateway(
+        baseUrl: settings.cloudBaseUrl,
+        apiKey: cloudApiKey,
+        model: settings.cloudModel,
+        temperature: settings.temperature,
+      );
+      _cloud = cloud;
+      _chatService = ChatService(
+        gateway: cloud,
+        contextSize: cloudContextSize,
+      );
+      return _chatService!;
+    }
     final gateway = NobodyWhoGateway(
       chatModelPath: settings.chatModelPath!,
       embedModelPath: settings.embedModelPath,
@@ -389,7 +416,11 @@ class AppState extends ChangeNotifier {
     notifyListeners();
     try {
       await ensureChat();
-      await _gateway?.ensureLoaded();
+      if (settings.backend == 'cloud' && cloudApiKey.isNotEmpty) {
+        await ensureChat();
+      } else {
+        await _gateway?.ensureLoaded();
+      }
       loadStage = '';
     } catch (e) {
       loadStage = '';
@@ -402,7 +433,9 @@ class AppState extends ChangeNotifier {
     // 先停生成再释放：避免流式迭代中 Rust 侧模型被回收
     _chatService?.stopGeneration();
     await _gateway?.dispose();
+    await _cloud?.dispose();
     _gateway = null;
+    _cloud = null;
     _chatService = null;
     await warmUp();
   }
@@ -413,7 +446,45 @@ class AppState extends ChangeNotifier {
     // 先刷 UI，再落盘：文件 IO 不该挡住滑块的即时反馈。
     notifyListeners();
     await settings.save(_supportDir);
-    await _gateway?.setTemperature(value);
+    if (settings.backend == 'cloud' && cloudApiKey.isNotEmpty) {
+      // 云端没有热更新采样器的接口，直接重建网关（不涉及模型加载）。
+      await reloadModels();
+    } else {
+      await _gateway?.setTemperature(value);
+    }
+  }
+
+  /// 切换对话后端：本地 GGUF / 云端 API。会重建 ChatService。
+  Future<void> setBackend(String backend) async {
+    settings.backend = backend;
+    await settings.save(_supportDir);
+    notifyListeners();
+    await reloadModels();
+  }
+
+  /// 保存云端 API key（Keychain/Keystore），并按需重建连接。
+  Future<void> setCloudKey(String key) async {
+    cloudApiKey = key.trim();
+    await secretStore.write(cloudKeyName, cloudApiKey.isEmpty ? null : cloudApiKey);
+    notifyListeners();
+  }
+
+  /// 保存云端 baseURL / 模型名。
+  Future<void> setCloudEndpoint({String? baseUrl, String? model}) async {
+    if (baseUrl != null) settings.cloudBaseUrl = baseUrl.trim();
+    if (model != null) settings.cloudModel = model.trim();
+    await settings.save(_supportDir);
+    notifyListeners();
+  }
+
+  /// 「测试连接」：GET /models，返回可用模型列表。
+  Future<List<String>> testCloudConnection() {
+    final g = CloudGateway(
+      baseUrl: settings.cloudBaseUrl,
+      apiKey: cloudApiKey,
+      model: settings.cloudModel,
+    );
+    return g.ping();
   }
 
   /// US-9：停止生成。
