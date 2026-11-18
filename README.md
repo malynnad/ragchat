@@ -90,7 +90,7 @@ x86_64 与 armeabi-v7a 包只给模拟器 / 老设备用，普通手机装 arm64
 | Qwen3.5-4B Q4_K_M | 2.55 GB | 默认档：2B 语无伦次时换它，手机上仍算能用 |
 | Qwen3-Embedding-0.6B Q8_0 | 639 MB | v2 情景记忆用，聊天不必装 |
 
-模型不下进 APK，第一次使用时在 App 内下载；镜像走 hf-mirror。也可以电脑 `adb push` 到 App 私有目录后点「重新扫描」，或直接用文件选择器导入。
+模型不下进 APK，第一次使用时在 App 内下载；源走**魔搭 ModelScope**（国内直连，实测 8 MB/s 级；hf-mirror 的 LFS 会跳海外 Xet，只有 0.5 MB/s）。也可以电脑 `adb push` 到 App 私有目录后点「重新扫描」，或直接用文件选择器导入。
 
 ## 日常使用
 

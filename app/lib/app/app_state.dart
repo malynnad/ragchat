@@ -9,6 +9,7 @@ import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
 import '../chat/app_db.dart';
+import '../rag/model_catalog.dart';
 import '../chat/chat_service.dart';
 import '../chat/memory_service.dart';
 import '../rag/models.dart';
@@ -75,7 +76,7 @@ class AppState extends ChangeNotifier {
   /// US-1 下载源：hf-mirror（国内可达，已 HEAD 验证）；nobodywho 内置下载器。
   /// ADR-0009：陪聊默认 Qwen3.5-2B 速度档，优先低延迟与低内存占用。
   static const chatModelUrl =
-      'https://hf-mirror.com/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf';
+      'https://www.modelscope.cn/models/unsloth/Qwen3.5-4B-GGUF/resolve/master/Qwen3.5-4B-Q4_K_M.gguf';
 
   /// 嵌入模型可选（MVP 不强制，US-24）；仅 v2 情景记忆需要。
   static const embedModelUrl =
@@ -345,12 +346,15 @@ class AppState extends ChangeNotifier {
     downloadingUrl = target;
     notifyListeners();
     try {
-      final path = await nw.downloadModel(
-        modelPath: target,
-        onDownloadProgress: (done, total) {
-          downloadProgress = total > 0 ? done / total : 0;
-          notifyListeners();
-        },
+      // 自己下，不用 nobodywho 的下载器：4B 文件 2.74 GB > 2^31，
+      // 原生下载器的长度/进度在那边会溢出，表现就是「下不动」。
+      final expected = modelCatalog
+          .where((m) => m.url == target)
+          .map((m) => m.sizeBytes)
+          .firstOrNull;
+      final path = await _downloadToModelsDir(
+        target,
+        expectedBytes: expected ?? 0,
       );
       if (isChat) {
         settings.chatModelPath = path;
@@ -366,6 +370,64 @@ class AppState extends ChangeNotifier {
       downloadLabel = null;
       downloadingUrl = null;
       notifyListeners();
+    }
+  }
+
+  /// 流式下载到模型目录；支持 >2GB、跟随 hf-mirror 的 302 跳转。
+  Future<String> _downloadToModelsDir(
+    String url, {
+    int expectedBytes = 0,
+  }) async {
+    final dir = Directory(modelsDirPath)..createSync(recursive: true);
+    final name = Uri.parse(url).pathSegments.last;
+    final dest = File(p.join(dir.path, name));
+    final tmp = File('${dest.path}.part');
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 30)
+      ..autoUncompress = false;
+    IOSink? sink;
+    try {
+      debugPrint('[download] start $url');
+      final req = await client.getUrl(Uri.parse(url));
+      req.headers.set('User-Agent', 'RAGchat/1.0');
+      final resp = await req.close();
+      debugPrint(
+        '[download] status=${resp.statusCode} len=${resp.contentLength}',
+      );
+      if (resp.statusCode != 200) {
+        throw StateError('下载失败：HTTP ${resp.statusCode}');
+      }
+      // 魔搭有些文件走 chunked、不给 content-length：退回目录里的已知体积。
+      final total = resp.contentLength > 0
+          ? resp.contentLength
+          : expectedBytes;
+      var done = 0;
+      sink = tmp.openWrite();
+      await for (final chunk in resp) {
+        sink.add(chunk);
+        done += chunk.length;
+        if (total > 0) {
+          downloadProgress = (done / total).clamp(0.0, 1.0);
+          notifyListeners();
+        }
+      }
+      await sink.flush();
+      await sink.close();
+      sink = null;
+      if (dest.existsSync()) await dest.delete();
+      await tmp.rename(dest.path);
+      debugPrint('[download] saved ${dest.path} bytes=$done');
+      return dest.path;
+    } catch (e) {
+      await sink?.close();
+      if (tmp.existsSync()) {
+        try {
+          await tmp.delete();
+        } catch (_) {}
+      }
+      rethrow;
+    } finally {
+      client.close(force: true);
     }
   }
 

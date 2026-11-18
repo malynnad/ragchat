@@ -640,7 +640,7 @@ class _CatalogSectionState extends State<_CatalogSection> {
               children: [
                 Expanded(
                   child: Text(
-                    '国内镜像；下载即切换，不支持断点续传',
+                    '魔搭 ModelScope（国内直连）；下载即切换，不支持断点续传',
                     style: TextStyle(fontSize: kFontBody, color: secondary),
                   ),
                 ),
@@ -661,8 +661,7 @@ class _CatalogSectionState extends State<_CatalogSection> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
               child: Text(
-                '只留聊天够用的两档：0.6B 更快，2B 更稳。'
-                '嵌入模型只在 v2 情景记忆时用得上，聊天不必装。',
+                '0.6B 最快，2B 折中，4B 默认；嵌入模型只在 v2 情景记忆时用得上。',
                 style: TextStyle(fontSize: kFontCaption, color: secondary),
               ),
             ),
@@ -843,6 +842,9 @@ class _PersonaSection extends StatelessWidget {
     AppState state,
     PersonaCard card,
   ) async {
+    // 先把焦点从模型名/API key 输入框收掉：否则编辑完返回，
+    // 系统会把焦点还给那个输入框，键盘自己弹出来。
+    FocusManager.instance.primaryFocus?.unfocus();
     final edited = await showPersonaEditor(context, initial: card);
     if (edited == null) return;
     await state.savePersona(edited);

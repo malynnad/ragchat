@@ -6,6 +6,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show debugPrint;
+
 import 'model_gateway.dart';
 import 'models.dart';
 
@@ -97,6 +99,7 @@ class CloudGateway implements ChatGateway {
         }),
       );
       final resp = await req.close().timeout(timeout);
+      debugPrint('[cloud] model=$model status=${resp.statusCode}');
       if (resp.statusCode != 200) {
         final body = await resp
             .transform(utf8.decoder)

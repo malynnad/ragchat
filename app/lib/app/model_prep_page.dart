@@ -321,7 +321,7 @@ class _UsbDisclosureState extends State<_UsbDisclosure> {
               children: [
                 Expanded(
                   child: Text(
-                    'USB 手动导入说明（国内网络兜底）',
+                    'USB 手动导入说明（网络兜底）',
                     style: TextStyle(fontSize: kFontBody, color: label),
                   ),
                 ),

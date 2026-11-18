@@ -10,8 +10,8 @@ void main() {
     for (final m in modelCatalog) {
       expect(
         m.url,
-        startsWith('https://hf-mirror.com/'),
-        reason: '${m.label} 应走国内镜像',
+        startsWith('https://www.modelscope.cn/'),
+        reason: '${m.label} 应走魔搭（国内直连）',
       );
       expect(m.label, isNotEmpty);
       expect(m.sizeBytes, greaterThan(0));

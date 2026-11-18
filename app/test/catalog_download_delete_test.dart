@@ -127,9 +127,9 @@ void main() {
 
       await tester.pumpWidget(wrap(state));
       await tester.pumpAndSettle();
-      await tester.ensureVisible(find.text('国内镜像；下载即切换，不支持断点续传'));
+      await tester.ensureVisible(find.text('魔搭 ModelScope（国内直连）；下载即切换，不支持断点续传'));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('国内镜像；下载即切换，不支持断点续传'));
+      await tester.tap(find.text('魔搭 ModelScope（国内直连）；下载即切换，不支持断点续传'));
       await tester.pumpAndSettle();
       await tester.ensureVisible(find.byType(CircularProgressIndicator));
       await tester.pumpAndSettle();
