@@ -2,7 +2,10 @@
 import 'package:flutter/cupertino.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ragchat/app/app_state.dart';
 import 'package:ragchat/app/ios_dialogs.dart';
+import 'package:ragchat/app/settings.dart';
+import 'package:ragchat/app/persona.dart';
 import 'package:ragchat/app/persona.dart';
 import 'package:ragchat/app/persona_editor.dart';
 import 'package:ragchat/app/theme.dart';
@@ -136,6 +139,30 @@ void main() {
     expect(saved!.id, 'cloud');
     expect(saved!.text, contains('额外一句'));
     expect(saved!.render(), contains('额外一句'));
+  });
+
+  testWidgets('云端人设的 system 预算显示 6000，不再是 800', (tester) async {
+    tallScreen(tester);
+    final state = AppState();
+    state.settings = AppSettings(backend: 'cloud');
+    PersonaCard? saved;
+    await tester.pumpWidget(
+      AppStateScope(
+        state: state,
+        child: host(
+          (ctx) async => saved = await showPersonaEditor(
+            ctx,
+            initial: cloudPersonaDefault,
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('打开'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('云端 system 一共 6000 token'), findsOneWidget);
+    expect(find.textContaining('800 token'), findsNothing);
+    expect(saved, isNull);
   });
 
   testWidgets('取消不返回任何卡', (tester) async {

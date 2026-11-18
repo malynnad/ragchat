@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../rag/token_budget.dart';
+import 'app_state.dart';
 import 'ios_widgets.dart';
 import 'paper.dart';
 import 'persona.dart';
@@ -157,7 +158,7 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
             ),
           ),
           const SizedBox(height: 16),
-          _budgetSection(used, secondary),
+          _budgetSection(context, used, secondary),
           const SizedBox(height: 16),
           IosSection(
             header: '写入 system 的原文',
@@ -206,18 +207,26 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
   }
 
   /// 预算表：system 共 800，人设超过软上限就开始挤记忆。
-  Widget _budgetSection(int used, Color secondary) {
-    final ratio = (used / personaSoftBudgetTokens).clamp(0.0, 1.0).toDouble();
-    final over = used > personaSoftBudgetTokens;
+  Widget _budgetSection(BuildContext context, int used, Color secondary) {
+    // 预算跟着后端走：本地 800，云端 6000（ADR-0013/0014）。
+    final cloud =
+        AppStateScope.maybeOf(context)?.settings.backend == 'cloud';
+    final budget = cloud
+        ? AppState.cloudSystemBudget
+        : systemBudgetTokens;
+    final soft = cloud ? (budget * 0.6).round() : personaSoftBudgetTokens;
+    final ratio = (used / soft).clamp(0.0, 1.0).toDouble();
+    final over = used > soft;
     final barColor = over
         ? CupertinoColors.systemRed.resolveFrom(context)
         : paperOf(context).ink;
-    final left = personaSoftBudgetTokens - used;
+    final left = soft - used;
+    final where = cloud ? '云端' : '本地';
     return IosSection(
-      header: 'system 预算',
+      header: 'system 预算（$where）',
       footer: over
-          ? '超过软上限了：system 一共 800 token，人设占得多，长期记忆就挤不进去。'
-          : 'system 一共 800 token，人设建议 ≤$personaSoftBudgetTokens，剩下留给长期记忆。',
+          ? '超过软上限了：$where system 一共 $budget token，人设占得多，长期记忆就挤不进去。'
+          : '$where system 一共 $budget token，人设建议 ≤$soft，剩下留给长期记忆。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -706,4 +706,8 @@ class AppStateScope extends InheritedNotifier<AppState> {
 
   static AppState of(BuildContext context) =>
       context.dependOnInheritedWidgetOfExactType<AppStateScope>()!.notifier!;
+
+  /// 弹层/编辑器这类可能被单独测试的地方用它：拿不到状态就回落到无状态。
+  static AppState? maybeOf(BuildContext context) =>
+      context.dependOnInheritedWidgetOfExactType<AppStateScope>()?.notifier;
 }
