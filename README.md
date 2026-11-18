@@ -135,8 +135,8 @@ RAGchat/
 │   │   ├── app/             界面：纸页组件、页面、人设编辑器、设置
 │   │   ├── chat/            会话与记忆：SQLite、ChatService、记忆提取
 │   │   ├── rag/             模型接缝：nobodywho 网关、预算估算、模型目录
-│   │   └── main.dart        入口（开机动画 → 主页 / 模型准备页）
-│   ├── assets/branding/     图标与开机图
+│   │   └── main.dart        入口（直接进主页 / 模型准备页）
+│   ├── assets/branding/     图标
 │   ├── android/             Android 工程（applicationId: com.dannylam.ragchat）
 │   └── test/                91 个测试（单元 + widget）
 ├── docs/

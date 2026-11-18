@@ -579,11 +579,13 @@ class HoldToConfirmButton extends StatefulWidget {
     required this.label,
     required this.onCompleted,
     this.hold = const Duration(milliseconds: 900),
+    this.icon = CupertinoIcons.trash,
   });
 
   final String label;
   final VoidCallback onCompleted;
   final Duration hold;
+  final IconData icon;
 
   @override
   State<HoldToConfirmButton> createState() => _HoldToConfirmButtonState();
@@ -675,11 +677,7 @@ class _HoldToConfirmButtonState extends State<HoldToConfirmButton>
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(
-                            CupertinoIcons.trash,
-                            size: 17,
-                            color: textColor,
-                          ),
+                          Icon(widget.icon, size: 17, color: textColor),
                           const SizedBox(width: 8),
                           Text(
                             widget.label,

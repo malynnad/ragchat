@@ -850,25 +850,10 @@ class _PersonaSection extends StatelessWidget {
     await state.savePersona(edited);
   }
 
-  Future<void> _reset(BuildContext context, AppState state) async {
-    final name = personaSlotDefault(state.settings.backend).name;
-    final ok = await showIosConfirm(
-      context: context,
-      title: '恢复这一张',
-      message: '当前槽位会变回内置「$name」，你写的内容会丢。',
-      confirmLabel: '恢复',
-      destructive: true,
-    );
-    if (ok) await state.resetPersona();
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
     final cards = state.settings.personas();
-    final active = state.activePersonaCard();
-    final p = paperOf(context);
-    final secondary = p.muted;
 
     PersonaCard cardFor(String id) =>
         cards.where((c) => c.id == id).firstOrNull ??
@@ -876,9 +861,6 @@ class _PersonaSection extends StatelessWidget {
 
     return IosSection(
       header: '03 / PERSONA',
-      footer:
-          '只有两张：本地用短人设，云端用长人设。点一行会把对话切到那个后端，'
-          '内容各自保存、互不覆盖；改名也会跟着显示。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -893,30 +875,12 @@ class _PersonaSection extends StatelessWidget {
               isActive: state.settings.backend == _slots[i].$1,
             ),
           ],
-          const SizedBox(height: 6),
-          Text(
-            active.render(),
-            maxLines: 3,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(fontSize: kFontCaption, color: secondary),
-          ),
-          const Divider(height: 16),
-          Row(
-            children: [
-              CupertinoButton(
-                key: const ValueKey('persona-reset'),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 8,
-                  vertical: 6,
-                ),
-                minimumSize: Size.zero,
-                onPressed: () => _reset(context, state),
-                child: const Text(
-                  '恢复这一张',
-                  style: TextStyle(fontSize: kFontBody),
-                ),
-              ),
-            ],
+          const SizedBox(height: 10),
+          HoldToConfirmButton(
+            key: const ValueKey('persona-reset'),
+            label: '恢复预设',
+            icon: CupertinoIcons.arrow_counterclockwise,
+            onCompleted: () => state.resetPersona(),
           ),
         ],
       ),

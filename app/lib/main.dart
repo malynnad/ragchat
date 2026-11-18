@@ -7,7 +7,6 @@ import 'app/app_state.dart';
 import 'app/home_page.dart';
 import 'app/ios_dialogs.dart';
 import 'app/model_prep_page.dart';
-import 'app/splash_gate.dart';
 import 'app/theme.dart';
 
 /// 正式入口：首启模型准备页（US-1），确认后底部标签栏主页（iOS 风格）。
@@ -50,13 +49,11 @@ class RagKbApp extends StatelessWidget {
               : buildCupertinoLightTheme(),
         );
       },
-      // 开机动画盖在第一帧上：图标放大→透明→主界面。
-      home: SplashGate(
-        child: AnimatedBuilder(
-          animation: state,
-          builder: (_, _) =>
-              state.entered ? const HomePage() : const ModelPrepPage(),
-        ),
+      // 不做开机动画：首帧直接进对话（或模型准备页）。
+      home: AnimatedBuilder(
+        animation: state,
+        builder: (_, _) =>
+            state.entered ? const HomePage() : const ModelPrepPage(),
       ),
     );
   }
