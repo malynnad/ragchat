@@ -394,6 +394,9 @@ class AppState extends ChangeNotifier {
       );
       return _chatService!;
     }
+    if (settings.chatModelPath == null) {
+      throw StateError('还没有选择聊天模型');
+    }
     final gateway = NobodyWhoGateway(
       chatModelPath: settings.chatModelPath!,
       embedModelPath: settings.embedModelPath,
@@ -412,6 +415,15 @@ class AppState extends ChangeNotifier {
   /// 进主页时预热模型（真机）。
   Future<void> warmUp() async {
     if (gatewayLoaded) return;
+    if (!settings.confirmed) return;
+    final cloudReady = settings.backend == 'cloud' && cloudApiKey.isNotEmpty;
+    if (!modelsReady && !cloudReady) {
+      // 用户选了「稍后配置」：没有模型就别去加载，也别挂红色错误条。
+      loadStage = '';
+      loadError = null;
+      notifyListeners();
+      return;
+    }
     loadError = null;
     notifyListeners();
     try {
