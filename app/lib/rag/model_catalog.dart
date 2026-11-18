@@ -35,7 +35,14 @@ const List<CatalogModel> modelCatalog = [
     label: 'Qwen3.5-2B Q4_K_M',
     url: 'https://hf-mirror.com/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf',
     sizeBytes: 1280835840,
-    note: '默认档：约 1.28 GiB，写人设、聊天都跟得住',
+    note: '速度档：约 1.28 GiB，聊得动但容易跑题、复读',
+  ),
+  CatalogModel(
+    isChat: true,
+    label: 'Qwen3.5-4B Q4_K_M',
+    url: 'https://hf-mirror.com/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf',
+    sizeBytes: 2740937888,
+    note: '默认档：约 2.55 GiB，2B 语无伦次时换它，手机上仍算能用',
     isDefault: true,
   ),
   CatalogModel(

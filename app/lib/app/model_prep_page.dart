@@ -93,24 +93,48 @@ class ModelPrepPage extends StatelessWidget {
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(kPageMargin, 8, kPageMargin, 12),
-          child: GestureDetector(
-            onTap: state.modelsReady ? state.confirmModels : null,
-            child: Container(
-              height: 54,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: state.modelsReady ? p.ink : p.track,
-                borderRadius: BorderRadius.circular(27),
-              ),
-              child: Text(
-                '保存并开始聊天',
-                style: TextStyle(
-                  fontSize: kFontControl,
-                  fontWeight: FontWeight.w600,
-                  color: state.modelsReady ? p.milk : p.muted,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              GestureDetector(
+                onTap: state.modelsReady ? state.confirmModels : null,
+                child: Container(
+                  height: 54,
+                  width: double.infinity,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: state.modelsReady ? p.ink : p.track,
+                    borderRadius: BorderRadius.circular(27),
+                  ),
+                  child: Text(
+                    '保存并开始聊天',
+                    style: TextStyle(
+                      fontSize: kFontControl,
+                      fontWeight: FontWeight.w600,
+                      color: state.modelsReady ? p.milk : p.muted,
+                    ),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: 6),
+              CupertinoButton(
+                key: const ValueKey('skip-model-setup'),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                onPressed: state.skipModelSetup,
+                child: Text(
+                  '稍后配置，先进入',
+                  style: TextStyle(
+                    fontSize: kFontControl,
+                    fontWeight: FontWeight.w500,
+                    color: p.ink,
+                  ),
+                ),
+              ),
+              Text(
+                '没有模型时也能看界面；设置里随时能再打开这一页。',
+                style: TextStyle(fontSize: kFontCode, color: p.muted),
+              ),
+            ],
           ),
         ),
       ),
@@ -138,7 +162,9 @@ class ModelPrepPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isChat ? '推荐 Qwen3.5-2B Q4_K_M（聊天速度优先）' : '可选；仅 v2 情景记忆需要',
+            isChat
+                ? '推荐 Qwen3.5-4B Q4_K_M（2B 更快，但容易跑题）'
+                : '可选；仅 v2 情景记忆需要',
             style: TextStyle(fontSize: kFontCaption, color: secondary),
           ),
           const SizedBox(height: 8),

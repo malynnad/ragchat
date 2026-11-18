@@ -28,7 +28,10 @@ void main() {
       await db.close();
     });
     final state = AppState();
-    state.settings = AppSettings(confirmed: true);
+    state.settings = AppSettings(
+      confirmed: true,
+      chatModelPath: '/tmp/fake-model.gguf',
+    );
     state.debugServiceFactory = () async => service;
     state.debugDb = db;
     return (state, gateway);

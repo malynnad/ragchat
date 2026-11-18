@@ -22,11 +22,11 @@ void main() {
   test('只留日常聊天档：生成两档、嵌入一档，默认项各恰好一个', () {
     final chat = modelCatalog.where((m) => m.isChat).toList();
     final embed = modelCatalog.where((m) => !m.isChat).toList();
-    expect(chat.length, 2, reason: '0.6B 与 2B 两档就够，大模型手机上太慢');
+    expect(chat.length, 3, reason: '0.6B 快聊 / 2B 折中 / 4B 质量档');
     expect(embed.length, 1, reason: '嵌入 0.6B 一个就够');
     expect(chat.where((m) => m.isDefault).length, 1);
     expect(embed.where((m) => m.isDefault).length, 1);
-    expect(chat.firstWhere((m) => m.isDefault).label, contains('Qwen3.5-2B'));
+    expect(chat.firstWhere((m) => m.isDefault).label, contains('Qwen3.5-4B'));
     expect(embed.firstWhere((m) => m.isDefault).label, contains('0.6B'));
   });
 

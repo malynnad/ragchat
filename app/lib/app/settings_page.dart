@@ -10,6 +10,7 @@ import 'format.dart';
 import 'ios_dialogs.dart';
 import 'ios_widgets.dart';
 import 'paper.dart';
+import 'model_prep_page.dart';
 import 'persona.dart';
 import 'persona_editor.dart';
 import 'theme.dart';
@@ -100,6 +101,19 @@ class SettingsPage extends StatelessWidget {
                   ],
                 ),
               ),
+              CupertinoButton(
+                key: const ValueKey('open-model-prep-from-settings'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                minimumSize: Size.zero,
+                onPressed: () => Navigator.of(context).push(
+                  CupertinoPageRoute(builder: (_) => const ModelPrepPage()),
+                ),
+                child: Text(
+                  '准备页',
+                  style: TextStyle(fontSize: kFontControl),
+                ),
+              ),
+              const Spacer(),
               CupertinoButton(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 minimumSize: Size.zero,

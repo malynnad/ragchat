@@ -108,6 +108,15 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
     final q = _controller.text.trim();
     if (q.isEmpty || _busy) return;
     final state = AppStateScope.of(context);
+    // 还没配模型：给个说明，别让 ensureChat 里 settings.chatModelPath! 崩掉。
+    if (state.settings.chatModelPath == null) {
+      await showIosAlert(
+        context: context,
+        title: '还没有聊天模型',
+        message: '先去设置 → 01 / MODEL 里下载或选择一个 GGUF，回来就能聊。',
+      );
+      return;
+    }
     // 容量预检（ADR-0006）：满了不发起请求，直接引导新对话。
     if (state.contextUsage() >= 1) {
       _showContextFullDialog();

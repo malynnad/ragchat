@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'app_state.dart';
 import 'memory_page.dart';
+import 'model_prep_page.dart';
 import 'paper.dart';
 import 'qa_page.dart';
 import 'theme.dart';
@@ -64,6 +65,38 @@ class _IosShellState extends State<IosShell> {
                 bottom: false,
                 child: Column(
                   children: [
+                    if (!state.modelsReady)
+                      _Banner(
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                '还没有聊天模型：现在能看界面，聊天前在设置里配一个',
+                                style: TextStyle(
+                                  fontSize: kFontCaption,
+                                  color: p.muted,
+                                ),
+                              ),
+                            ),
+                            CupertinoButton(
+                              key: const ValueKey('open-model-setup'),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              minimumSize: Size.zero,
+                              onPressed: () => Navigator.of(context).push(
+                                CupertinoPageRoute(
+                                  builder: (_) => const ModelPrepPage(),
+                                ),
+                              ),
+                              child: Text(
+                                '去配置',
+                                style: TextStyle(fontSize: kFontControl),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     if (state.loadStage.isNotEmpty && !state.gatewayLoaded)
                       _Banner(
                         child: Row(

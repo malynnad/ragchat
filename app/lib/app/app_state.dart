@@ -64,7 +64,7 @@ class AppState extends ChangeNotifier {
   /// US-1 下载源：hf-mirror（国内可达，已 HEAD 验证）；nobodywho 内置下载器。
   /// ADR-0009：陪聊默认 Qwen3.5-2B 速度档，优先低延迟与低内存占用。
   static const chatModelUrl =
-      'https://hf-mirror.com/unsloth/Qwen3.5-2B-GGUF/resolve/main/Qwen3.5-2B-Q4_K_M.gguf';
+      'https://hf-mirror.com/unsloth/Qwen3.5-4B-GGUF/resolve/main/Qwen3.5-4B-Q4_K_M.gguf';
 
   /// 嵌入模型可选（MVP 不强制，US-24）；仅 v2 情景记忆需要。
   static const embedModelUrl =
@@ -75,7 +75,8 @@ class AppState extends ChangeNotifier {
       File(settings.chatModelPath!).existsSync();
 
   /// 首启必经模型准备页（US-1）；确认后直达主页。
-  bool get entered => settings.confirmed && modelsReady;
+  bool get entered =>
+      settings.confirmed && (modelsReady || settings.skipModelSetup);
 
   bool get gatewayLoaded => _gateway?.loaded ?? false;
 
@@ -226,6 +227,15 @@ class AppState extends ChangeNotifier {
 
   Future<void> confirmModels() async {
     settings.confirmed = true;
+    settings.skipModelSetup = false;
+    await settings.save(_supportDir);
+    notifyListeners();
+  }
+
+  /// 「稍后配置」：没有模型也先进主界面，模型页从设置里再打开。
+  Future<void> skipModelSetup() async {
+    settings.confirmed = true;
+    settings.skipModelSetup = true;
     await settings.save(_supportDir);
     notifyListeners();
   }

@@ -61,6 +61,25 @@ void main() {
     expect(state.sessionTurns.single.answer, '新答案');
   });
 
+  test('没有模型也能「稍后配置」进主界面', () async {
+    final dir = await Directory.systemTemp.createTemp('ragchat-skip');
+    addTearDown(() => dir.delete(recursive: true));
+    final state = AppState();
+    state.debugSupportDir = dir.path;
+
+    expect(state.entered, isFalse);
+    await state.skipModelSetup();
+    expect(state.entered, isTrue);
+    expect(state.settings.skipModelSetup, isTrue);
+
+    // 之后配好模型再确认，跳过标记会被清掉。
+    final model = File('${dir.path}/fake.gguf')..writeAsStringSync('x');
+    state.settings.chatModelPath = model.path;
+    await state.confirmModels();
+    expect(state.settings.skipModelSetup, isFalse);
+    expect(state.entered, isTrue);
+  });
+
   test('人设：单卡编辑即落盘，system 用新正文，可恢复默认', () async {
     final dir = await Directory.systemTemp.createTemp('ragchat-persona');
     addTearDown(() => dir.delete(recursive: true));

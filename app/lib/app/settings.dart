@@ -16,6 +16,7 @@ class AppSettings {
     this.personasJson,
     this.accentId = 'blue',
     this.temperature = 0.6,
+    this.skipModelSetup = false,
   });
 
   /// ADR-0005：默认 CPU；GPU 仅作开关
@@ -41,6 +42,9 @@ class AppSettings {
 
   /// 采样温度：越低越稳（2B 模型高了容易语无伦次），默认 0.6。
   double temperature;
+
+  /// 用户选择「稍后配置模型」：允许没有模型也进主界面。
+  bool skipModelSetup;
 
   /// 当前人设卡（列表里找不到 activePersonaId 时回退第一张）。
   PersonaCard activePersona(List<PersonaCard> cards) => cards.firstWhere(
@@ -68,6 +72,7 @@ class AppSettings {
         personasJson: j['personasJson'] as String?,
         accentId: j['accentId'] as String? ?? 'blue',
         temperature: (j['temperature'] as num?)?.toDouble() ?? 0.6,
+        skipModelSetup: j['skipModelSetup'] as bool? ?? false,
       );
     } catch (_) {
       return AppSettings();
@@ -85,6 +90,7 @@ class AppSettings {
         'personasJson': personasJson ?? PersonaCard.encodeList(builtinPersonas),
         'accentId': accentId,
         'temperature': temperature,
+        'skipModelSetup': skipModelSetup,
       }),
     );
   }

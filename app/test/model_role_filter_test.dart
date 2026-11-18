@@ -66,10 +66,11 @@ void main() {
       }
     });
 
-    test('按类型分组再升序：生成 0.6B→2B，嵌入 0.6B', () {
+    test('按类型分组再升序：生成 0.6B→2B→4B，嵌入 0.6B', () {
       expect(sortedCatalog().map((m) => m.label).toList(), [
         'Qwen3-0.6B Q4_K_M',
         'Qwen3.5-2B Q4_K_M',
+        'Qwen3.5-4B Q4_K_M',
         'Qwen3-Embedding-0.6B Q8_0',
       ]);
     });
