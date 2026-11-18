@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ 会强制显示「图标 + 背景」的启动画面；这里把图标抹掉，
+         背景设成纸色，冷启动就直接是一片纸，不再有中间那张头像。 -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">@color/paper_bg</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/paper_bg</item>
+        <item name="android:windowBackground">@color/paper_bg</item>
+    </style>
+</resources>
