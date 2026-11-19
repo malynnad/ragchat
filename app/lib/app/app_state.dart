@@ -98,6 +98,7 @@ class AppState extends ChangeNotifier {
     settings = await AppSettings.load(_supportDir);
     cloudApiKey = await secretStore.read(cloudKeyName) ?? '';
     await normalizePersonaSlots();
+    await upgradeLocalPersona();
     _db = await AppDb.openFile(p.join(_supportDir, 'rag.db'));
     final ext = await getExternalStorageDirectory();
     modelsDirPath = p.join(ext!.path, 'models');
@@ -212,6 +213,26 @@ class AppState extends ChangeNotifier {
   /// 把当前槽位恢复成默认（本地小暖 / 云端傲娇鱼）。
   Future<void> resetPersona() async {
     await savePersona(personaSlotDefault(settings.backend));
+  }
+
+  /// 把老的「小暖」本地卡换成大肥鱼精简版（同一个人，只是短）。
+  Future<void> upgradeLocalPersona() async {
+    final cards = [...settings.personas()];
+    final i = cards.indexWhere((c) => c.id == 'local');
+    if (i < 0) return;
+    final card = cards[i];
+    if (card.text.trim().isNotEmpty) return;
+    // 旧版小暖：性格里有「温和、爱笑」。
+    if (!card.personality.contains('温和') &&
+        !card.catchphrase.contains('慢慢说')) {
+      return;
+    }
+    cards[i] = localPersonaDefault.copyWith(
+      name: card.name == '小暖' || card.name.isEmpty ? '大肥鱼' : card.name,
+    );
+    settings.personasJson = PersonaCard.encodeList(cards);
+    await settings.save(_supportDir);
+    notifyListeners();
   }
 
   /// 旧数据迁移：单卡 / 预设 id（companion、dafeiyu）→ local / cloud 两个槽位。

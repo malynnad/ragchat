@@ -101,17 +101,17 @@ void main() {
     state.debugSupportDir = dir.path;
     await state.normalizePersonaSlots();
 
-    expect(state.activePersonaCard().name, '小暖', reason: '本地默认');
+    expect(state.activePersonaCard().name, '大肥鱼', reason: '本地默认');
 
     // 改云端那张的名字与正文：切走再切回，改动不能丢。
     await state.setBackend('cloud');
-    expect(state.activePersonaCard().name, '傲娇鱼');
+    expect(state.activePersonaCard().name, '大肥鱼');
     await state.savePersona(
       state.activePersonaCard().copyWith(name: '我的傲娇鱼'),
     );
 
     await state.setBackend('local');
-    expect(state.activePersonaCard().name, '小暖');
+    expect(state.activePersonaCard().name, '大肥鱼');
     await state.savePersona(
       state.activePersonaCard().copyWith(name: '我的小暖'),
     );
@@ -123,7 +123,7 @@ void main() {
 
     // 恢复默认只影响当前槽位。
     await state.resetPersona();
-    expect(state.activePersonaCard().name, '小暖');
+    expect(state.activePersonaCard().name, '大肥鱼');
     await state.setBackend('cloud');
     expect(state.activePersonaCard().name, '我的傲娇鱼');
   });
@@ -135,7 +135,7 @@ void main() {
     state.debugSupportDir = dir.path;
 
     final base = state.activePersonaCard();
-    expect(base.name, '小暖', reason: '本地默认短人设');
+    expect(base.name, '大肥鱼', reason: '本地默认短人设');
 
     await state.savePersona(
       base.copyWith(name: '阿鱼', personality: '话少，爱吃白饭'),
@@ -153,8 +153,8 @@ void main() {
     expect(reloaded.activePersonaId, 'local');
 
     await state.resetPersona();
-    expect(state.activePersonaCard().name, '小暖');
-    expect(state.activePersonaCard().catchphrase, contains('嗯，我在'));
+    expect(state.activePersonaCard().name, '大肥鱼');
+    expect(state.activePersonaCard().catchphrase, contains('才不是'));
   });
 }
 

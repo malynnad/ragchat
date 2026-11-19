@@ -208,10 +208,10 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 生成看门狗：2B 模型偶尔会长时间自言自语，45s 还没完就停掉。
+  /// 生成看门狗：本地模型偶尔会长时间自言自语，60s 还没完就停掉。
   void _startWatchdog(_AssistantEntry assistant) {
     _watchdog?.cancel();
-    _watchdog = Timer(const Duration(seconds: 45), () {
+    _watchdog = Timer(const Duration(seconds: 60), () {
       if (!mounted || !assistant.busy) return;
       AppStateScope.of(context).stopGeneration();
       setState(() {
