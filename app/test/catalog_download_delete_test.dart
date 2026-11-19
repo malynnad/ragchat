@@ -112,16 +112,16 @@ void main() {
       addTearDown(() => dir.deleteSync(recursive: true));
       final state = await buildState(dir);
       final downloading = modelCatalog.firstWhere(
-        (m) => m.isChat && m.label.contains('0.6B'),
+        (m) => m.isChat && m.label.contains('2B'),
       );
       final embed06 = modelCatalog.firstWhere(
         (m) => !m.isChat && m.label.contains('0.6B'),
       );
-      // 已下载：0.6B 文件名匹配 → ✓+垃圾桶。
+      // 已下载：2B 文件名匹配 → ✓+垃圾桶。
       state.modelFiles.add(
         ModelFile(p.join(dir.path, p.basename(embed06.url)), 1),
       );
-      // 正在下载：聊天 0.6B → 圆环 40%。
+      // 正在下载：聊天 2B → 圆环 40%。
       state.downloadingUrl = downloading.url;
       state.downloadProgress = 0.4;
 

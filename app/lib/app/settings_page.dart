@@ -663,7 +663,7 @@ class _CatalogSectionState extends State<_CatalogSection> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
               child: Text(
-                '0.6B 最快，2B 折中，4B 默认；嵌入模型只在 v2 情景记忆时用得上。',
+                '2B 速度档，4B 默认，9B 质量档；嵌入模型只在 v2 情景记忆时用得上。',
                 style: TextStyle(fontSize: kFontCaption, color: secondary),
               ),
             ),

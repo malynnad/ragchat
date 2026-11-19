@@ -80,7 +80,7 @@ class AppState extends ChangeNotifier {
 
   /// 嵌入模型可选（MVP 不强制，US-24）；仅 v2 情景记忆需要。
   static const embedModelUrl =
-      'https://hf-mirror.com/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf';
+      'https://www.modelscope.cn/models/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/master/Qwen3-Embedding-0.6B-Q8_0.gguf';
 
   bool get modelsReady =>
       settings.chatModelPath != null &&
