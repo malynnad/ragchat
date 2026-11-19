@@ -57,6 +57,10 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
 
   @override
   void initState() {
+    // 引擎读完（或被取消）时把按钮收回去。
+    _tts.onDone = () {
+      if (mounted) setState(() => _speaking = null);
+    };
     super.initState();
     WidgetsBinding.instance.addObserver(this);
   }
@@ -591,9 +595,8 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('这台手机没有可用的语音引擎，装一个系统 TTS 就行')),
       );
-      return;
     }
-    setState(() => _speaking = null);
+    // 成功时保持「停止」，等引擎 completion 回调再收回。
   }
 
   Future<void> _copyAnswer(_AssistantEntry a) async {
