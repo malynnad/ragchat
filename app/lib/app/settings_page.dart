@@ -1,9 +1,11 @@
+import 'dart:io';
 // ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 
 import '../rag/model_catalog.dart';
+import '../rag/tts_service.dart';
 import '../rag/token_budget.dart';
 import 'app_state.dart';
 import 'format.dart';
@@ -41,77 +43,9 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 28),
           const _CloudSection(),
           const SizedBox(height: 28),
-          _voiceSection(context, state),
+          const _VoiceSection(),
           const SizedBox(height: 28),
           _storageSection(context, state, stats),
-        ],
-      ),
-    );
-  }
-
-  /// 系统 TTS：离线朗读，不联网、不要 key。
-  Widget _voiceSection(BuildContext context, AppState state) {
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
-    final rate = state.settings.ttsRate;
-    Widget rateChip(String label, double value) {
-      final active = (rate - value).abs() < 0.01;
-      return CupertinoButton(
-        key: ValueKey('tts-rate-$value'),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-        minimumSize: Size.zero,
-        color: active
-            ? paperOf(context).ink
-            : CupertinoColors.tertiarySystemFill.resolveFrom(context),
-        onPressed: () => state.setTtsRate(value),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: kFontCaption,
-            color: active ? paperOf(context).milk : paperOf(context).ink,
-          ),
-        ),
-      );
-    }
-
-    return IosSection(
-      header: '06 / VOICE',
-      footer:
-          '用手机自带的语音引擎，离线、免费、不耗流量。'
-          '觉得机械就去应用商店装一个中文 TTS 引擎，再回来点「朗读」。',
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '新回复自动朗读',
-                  style: TextStyle(fontSize: kFontBody),
-                ),
-              ),
-              CupertinoSwitch(
-                key: const ValueKey('tts-auto-read'),
-                value: state.settings.ttsAutoRead,
-                onChanged: (v) => state.setTtsAutoRead(v),
-              ),
-            ],
-          ),
-          const Divider(height: 14),
-          Row(
-            children: [
-              Text('语速', style: TextStyle(fontSize: kFontBody)),
-              const SizedBox(width: 10),
-              rateChip('慢', 0.35),
-              const SizedBox(width: 8),
-              rateChip('正常', 0.5),
-              const SizedBox(width: 8),
-              rateChip('快', 0.65),
-              const Spacer(),
-              Text(
-                '${(rate * 100).round()}%',
-                style: TextStyle(fontSize: kFontCaption, color: secondary),
-              ),
-            ],
-          ),
         ],
       ),
     );
@@ -1005,6 +939,182 @@ class _PersonaSection extends StatelessWidget {
             minimumSize: Size.zero,
             onPressed: () => _edit(context, state, card),
             child: const Text('编辑', style: TextStyle(fontSize: kFontBody)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 系统 TTS：开关、语速、音色（引擎报什么就列什么）。
+class _VoiceSection extends StatefulWidget {
+  const _VoiceSection();
+
+  @override
+  State<_VoiceSection> createState() => _VoiceSectionState();
+}
+
+class _VoiceSectionState extends State<_VoiceSection> {
+  final _tts = TtsService();
+  List<TtsVoice>? _voices;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 单元测试里没有插件通道：别去查音色，免得留下 pending timer。
+    if (Platform.environment.containsKey('FLUTTER_TEST')) {
+      _failed = true;
+      return;
+    }
+    _tts.listVoices().then((v) {
+      if (!mounted) return;
+      setState(() {
+        _voices = v;
+        _failed = v.isEmpty;
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _tts.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = AppStateScope.of(context);
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final p = paperOf(context);
+    final s = state.settings;
+    final rate = s.ttsRate;
+    final voices = _voices;
+
+    Widget chip({
+      required String label,
+      required bool active,
+      required VoidCallback onTap,
+      Key? key,
+    }) => CupertinoButton(
+      key: key,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      minimumSize: Size.zero,
+      color: active ? p.ink : CupertinoColors.tertiarySystemFill.resolveFrom(context),
+      onPressed: onTap,
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: kFontCaption,
+          color: active ? p.milk : p.ink,
+        ),
+      ),
+    );
+
+    String voiceHint;
+    if (_failed) {
+      voiceHint = '这台手机没报任何语音引擎音色，装一个中文 TTS 引擎再来。';
+    } else if (voices == null) {
+      voiceHint = '正在读取系统音色…';
+    } else if (voices.length <= 1) {
+      voiceHint = '系统引擎只报了 ${voices.length} 个中文音色。想换声音，去应用商店装「讯飞语音引擎」之类的第三方引擎，回来这里就会多出来。';
+    } else {
+      voiceHint = '音色来自手机自带的 TTS 引擎；装了第三方引擎（讯飞、讯飞语记等）后这里会变多。';
+    }
+
+    return IosSection(
+      header: '06 / VOICE',
+      footer:
+          '用手机自带的语音引擎，离线、免费、不耗流量。'
+          '觉得机械就换个音色，或装第三方中文 TTS 引擎。',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '新回复自动朗读',
+                  style: TextStyle(fontSize: kFontBody),
+                ),
+              ),
+              CupertinoSwitch(
+                key: const ValueKey('tts-auto-read'),
+                value: s.ttsAutoRead,
+                onChanged: (v) => state.setTtsAutoRead(v),
+              ),
+            ],
+          ),
+          const Divider(height: 14),
+          Row(
+            children: [
+              Text('语速', style: TextStyle(fontSize: kFontBody)),
+              const SizedBox(width: 10),
+              chip(
+                label: '慢',
+                active: (rate - 0.35).abs() < 0.01,
+                onTap: () => state.setTtsRate(0.35),
+                key: const ValueKey('tts-rate-0.35'),
+              ),
+              const SizedBox(width: 8),
+              chip(
+                label: '正常',
+                active: (rate - 0.5).abs() < 0.01,
+                onTap: () => state.setTtsRate(0.5),
+                key: const ValueKey('tts-rate-0.5'),
+              ),
+              const SizedBox(width: 8),
+              chip(
+                label: '快',
+                active: (rate - 0.65).abs() < 0.01,
+                onTap: () => state.setTtsRate(0.65),
+                key: const ValueKey('tts-rate-0.65'),
+              ),
+              const Spacer(),
+              Text(
+                '${(rate * 100).round()}%',
+                style: TextStyle(fontSize: kFontCaption, color: secondary),
+              ),
+            ],
+          ),
+          const Divider(height: 14),
+          Row(
+            children: [
+              Text('音色', style: TextStyle(fontSize: kFontBody)),
+              const Spacer(),
+              if (s.ttsVoiceName != null)
+                CupertinoButton(
+                  key: const ValueKey('tts-voice-default'),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  minimumSize: Size.zero,
+                  onPressed: () => state.setTtsVoice(null, null),
+                  child: Text(
+                    '用默认',
+                    style: TextStyle(fontSize: kFontCaption, color: secondary),
+                  ),
+                ),
+            ],
+          ),
+          if (voices != null && voices.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final v in voices)
+                  chip(
+                    label: v.display,
+                    active: s.ttsVoiceName == v.name,
+                    onTap: () => state.setTtsVoice(v.name, v.locale),
+                    key: ValueKey('tts-voice-${v.name}'),
+                  ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 6),
+          Text(
+            voiceHint,
+            style: TextStyle(fontSize: kFontCaption, color: secondary),
           ),
         ],
       ),

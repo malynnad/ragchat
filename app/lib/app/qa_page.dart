@@ -586,9 +586,14 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
 
   Future<void> _speak(_AssistantEntry a) async {
     if (!mounted) return;
-    final rate = AppStateScope.of(context).settings.ttsRate;
+    final s = AppStateScope.of(context).settings;
     setState(() => _speaking = a);
-    final ok = await _tts.speak(a.answer, rate: rate);
+    final ok = await _tts.speak(
+      a.answer,
+      rate: s.ttsRate,
+      voiceName: s.ttsVoiceName,
+      voiceLocale: s.ttsVoiceLocale,
+    );
     if (!mounted) return;
     if (!ok) {
       setState(() => _speaking = null);

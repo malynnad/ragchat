@@ -22,6 +22,8 @@ class AppSettings {
     this.cloudModel = 'deepseek-flash',
     this.ttsAutoRead = false,
     this.ttsRate = 0.5,
+    this.ttsVoiceName,
+    this.ttsVoiceLocale,
   });
 
   /// ADR-0005：默认 CPU；GPU 仅作开关
@@ -66,6 +68,10 @@ class AppSettings {
   /// 系统 TTS 语速：0.1–0.9，中文 0.5 左右接近正常说话。
   double ttsRate;
 
+  /// 选中的系统音色（引擎里的 voice name + locale）；null = 引擎默认。
+  String? ttsVoiceName;
+  String? ttsVoiceLocale;
+
   /// 当前人设卡（列表里找不到 activePersonaId 时回退第一张）。
   PersonaCard activePersona(List<PersonaCard> cards) => cards.firstWhere(
     (c) => c.id == activePersonaId,
@@ -99,6 +105,8 @@ class AppSettings {
         cloudModel: j['cloudModel'] as String? ?? 'deepseek-flash',
         ttsAutoRead: j['ttsAutoRead'] as bool? ?? false,
         ttsRate: (j['ttsRate'] as num?)?.toDouble() ?? 0.5,
+        ttsVoiceName: j['ttsVoiceName'] as String?,
+        ttsVoiceLocale: j['ttsVoiceLocale'] as String?,
       );
     } catch (_) {
       return AppSettings();
@@ -122,6 +130,8 @@ class AppSettings {
         'cloudModel': cloudModel,
         'ttsAutoRead': ttsAutoRead,
         'ttsRate': ttsRate,
+        'ttsVoiceName': ttsVoiceName,
+        'ttsVoiceLocale': ttsVoiceLocale,
       }),
     );
   }
