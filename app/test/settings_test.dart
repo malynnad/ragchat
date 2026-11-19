@@ -22,7 +22,7 @@ void main() {
       expect(r, contains('你是小暖'));
       expect(r, contains('性格：温柔耐心'));
       expect(r, contains('说话：口语化'));
-      expect(r, contains('常说：「嗯，我在」'));
+      expect(r, contains('口癖（只是语气参考，别每句都加，也别照抄）：「嗯，我在」'));
       expect(r, contains('称呼用户为「你」'));
       expect(r, contains('不做：不给医疗建议'));
 

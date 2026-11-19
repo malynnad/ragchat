@@ -41,7 +41,7 @@ void main() {
     ),
   );
 
-  testWidgets('改口癖后保存，渲染出「常说」那句', (tester) async {
+  testWidgets('改口癖后保存，渲染出口癖那句', (tester) async {
     tallScreen(tester);
     PersonaCard? saved;
     await tester.pumpWidget(
@@ -58,7 +58,7 @@ void main() {
     );
     await tester.pump();
     // 预览实时跟着走。
-    expect(find.textContaining('常说：「那你慢慢说」'), findsWidgets);
+    expect(find.textContaining('「那你慢慢说」'), findsWidgets);
 
     await tester.tap(find.text('保存'));
     await tester.pumpAndSettle();
@@ -66,7 +66,7 @@ void main() {
     expect(saved, isNotNull);
     expect(saved!.id, 'x');
     expect(saved!.catchphrase, '那你慢慢说');
-    expect(saved!.render(), contains('常说：「那你慢慢说」'));
+    expect(saved!.render(), contains('「那你慢慢说」'));
   });
 
   testWidgets('字数有上限：性格最多 60 字', (tester) async {

@@ -80,6 +80,20 @@ void main() {
     expect(state.entered, isTrue);
   });
 
+  test('本地 system 不带口癖原文，云端才带（9B 会照抄开头）', () async {
+    final dir = await Directory.systemTemp.createTemp('ragchat-catch');
+    addTearDown(() => dir.delete(recursive: true));
+    final state = AppState();
+    state.debugSupportDir = dir.path;
+    await state.normalizePersonaSlots();
+
+    final localPrompt = state.systemPrompt();
+    expect(localPrompt, isNot(contains(state.activePersonaCard().catchphrase)));
+
+    await state.setBackend('cloud');
+    expect(state.systemPrompt(), contains(state.activePersonaCard().catchphrase));
+  });
+
   test('两个槽位：切后端用各自的卡，改过的名字两边都留得住', () async {
     final dir = await Directory.systemTemp.createTemp('ragchat-slots');
     addTearDown(() => dir.delete(recursive: true));

@@ -28,8 +28,9 @@ class ChatService {
     PersonaCard persona,
     List<MemoryEntry> memories, {
     int budget = systemBudgetTokens,
+    bool includeCatchphrase = true,
   }) {
-    final head = persona.render();
+    final head = persona.render(includeCatchphrase: includeCatchphrase);
     final used0 = estimateTokens(head) + estimateTokens('\n关于用户的长期记忆：');
     final contents = <String>[];
     var used = used0;

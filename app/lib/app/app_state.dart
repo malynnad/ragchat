@@ -270,6 +270,7 @@ class AppState extends ChangeNotifier {
   /// 云端上下文大得多，长人设 + 更多记忆也能装下（ADR-0013）。
   String systemPrompt() => ChatService.buildSystemPromptWithinBudget(
     activePersonaCard(),
+    includeCatchphrase: settings.backend == 'cloud',
     activeMemories(),
     budget: settings.backend == 'cloud' ? cloudSystemBudget : systemBudgetTokens,
   );

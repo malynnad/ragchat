@@ -91,11 +91,14 @@ class PersonaCard {
 
   /// system 消息片段：有内容的字段才渲染，一句到底不加标题。
   /// 旧数据只存了自由正文（ADR-0010）时，原样用那段。
-  String render() {
+  /// [includeCatchphrase]：本地小模型会把引号里的口癖原样复述到回复开头，
+  /// 所以本地 prompt 不带它，只在云端（更能听懂“别照抄”）时带上。
+  String render({bool includeCatchphrase = true}) {
     final parts = <String>[
       if (personality.isNotEmpty) '性格：$personality',
       if (style.isNotEmpty) '说话：$style',
-      if (catchphrase.isNotEmpty) '常说：「$catchphrase」',
+      if (includeCatchphrase && catchphrase.isNotEmpty)
+        '口癖（只是语气参考，别每句都加，也别照抄）：「$catchphrase」',
       if (addressTerm.isNotEmpty) '称呼用户为「$addressTerm」',
       if (boundary.isNotEmpty) '不做：$boundary',
     ];
@@ -104,7 +107,8 @@ class PersonaCard {
       if (legacy.isNotEmpty) return legacy;
       return name.isEmpty ? '' : '你是$name。';
     }
-    return '你是${name.isEmpty ? '聊天助手' : name}。${parts.join('。')}。';
+    return '你是${name.isEmpty ? '聊天助手' : name}。${parts.join('。')}。'
+        '口癖按语境自然使用，不要为了用而用；正常回答时不必带口癖。';
   }
 
   /// 序列化到 settings.json 的 personas 列表。
