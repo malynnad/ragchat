@@ -988,20 +988,18 @@ class _VoiceSectionState extends State<_VoiceSection> {
             ),
           ],
         ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: FractionallySizedBox(
-            widthFactor: 0.5,
-            child: CupertinoSlider(
-              key: key,
-              value: v,
-              min: min,
-              max: max,
-              divisions: divisions,
-              activeColor: p.ink,
-              onChanged: onChanged,
-              onChangeEnd: onChangeEnd,
-            ),
+        // Column 是 start 对齐：不撑满的话 slider 会缩到很窄。
+        SizedBox(
+          width: double.infinity,
+          child: CupertinoSlider(
+            key: key,
+            value: v,
+            min: min,
+            max: max,
+            divisions: divisions,
+            activeColor: p.ink,
+            onChanged: onChanged,
+            onChangeEnd: onChangeEnd,
           ),
         ),
       ],

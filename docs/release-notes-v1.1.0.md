@@ -42,7 +42,7 @@
 
 ```
 文件    RAGchat-1.1.0-arm64.apk
-sha256  3a29d058d480932f9a2998e43167a5c783410ff603b6babf38c368b17dd372b1
-大小    45,159,056 B（43 MB）
+sha256  cb10bcae100490fa1e9dfb01e70a4e8d773a5887700b1e8beec2611004bae1a1
+大小    45,161,404 B（43 MB）
 签名    release keystore，证书 SHA-256 69fc466d3ceb4a8f9c6f0d065b802b2667135232d89c80f7cafce72649b944a7
 ```
