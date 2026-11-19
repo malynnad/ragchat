@@ -944,38 +944,61 @@ class _PersonaSection extends StatelessWidget {
   }
 }
 
-/// 系统 TTS：自动朗读、语速、音调。引擎/音色用系统默认，不再让用户选。
-class _VoiceSection extends StatelessWidget {
+/// 系统 TTS：自动朗读、语速、音调（滑块）。引擎/音色用系统默认。
+class _VoiceSection extends StatefulWidget {
   const _VoiceSection();
+
+  @override
+  State<_VoiceSection> createState() => _VoiceSectionState();
+}
+
+class _VoiceSectionState extends State<_VoiceSection> {
+  double? _rate;
+  double? _pitch;
 
   @override
   Widget build(BuildContext context) {
     final state = AppStateScope.of(context);
-    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     final p = paperOf(context);
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
     final s = state.settings;
-    final rate = s.ttsRate;
+    final rate = (_rate ?? s.ttsRate).clamp(0.2, 0.8);
+    final pitch = (_pitch ?? s.ttsPitch).clamp(0.7, 1.3);
 
-    Widget chip({
+    Widget sliderRow({
       required String label,
-      required bool active,
-      required VoidCallback onTap,
-      Key? key,
-    }) => CupertinoButton(
-      key: key,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      minimumSize: Size.zero,
-      color: active
-          ? p.ink
-          : CupertinoColors.tertiarySystemFill.resolveFrom(context),
-      onPressed: onTap,
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: kFontCaption,
-          color: active ? p.milk : p.ink,
+      required String value,
+      required double v,
+      required double min,
+      required double max,
+      required int divisions,
+      required ValueChanged<double> onChanged,
+      required ValueChanged<double> onChangeEnd,
+      required Key key,
+    }) => Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text(label, style: TextStyle(fontSize: kFontBody)),
+            const Spacer(),
+            Text(
+              value,
+              style: TextStyle(fontSize: kFontCaption, color: secondary),
+            ),
+          ],
         ),
-      ),
+        CupertinoSlider(
+          key: key,
+          value: v,
+          min: min,
+          max: max,
+          divisions: divisions,
+          activeColor: p.ink,
+          onChanged: onChanged,
+          onChangeEnd: onChangeEnd,
+        ),
+      ],
     );
 
     return IosSection(
@@ -996,73 +1019,40 @@ class _VoiceSection extends StatelessWidget {
               CupertinoSwitch(
                 key: const ValueKey('tts-auto-read'),
                 value: s.ttsAutoRead,
+                activeTrackColor: p.ink,
                 onChanged: (v) => state.setTtsAutoRead(v),
               ),
             ],
           ),
-          const Divider(height: 14),
-          Row(
-            children: [
-              Text('语速', style: TextStyle(fontSize: kFontBody)),
-              const SizedBox(width: 10),
-              chip(
-                label: '慢',
-                active: (rate - 0.35).abs() < 0.01,
-                onTap: () => state.setTtsRate(0.35),
-                key: const ValueKey('tts-rate-0.35'),
-              ),
-              const SizedBox(width: 8),
-              chip(
-                label: '正常',
-                active: (rate - 0.5).abs() < 0.01,
-                onTap: () => state.setTtsRate(0.5),
-                key: const ValueKey('tts-rate-0.5'),
-              ),
-              const SizedBox(width: 8),
-              chip(
-                label: '快',
-                active: (rate - 0.65).abs() < 0.01,
-                onTap: () => state.setTtsRate(0.65),
-                key: const ValueKey('tts-rate-0.65'),
-              ),
-              const Spacer(),
-              Text(
-                '${(rate * 100).round()}%',
-                style: TextStyle(fontSize: kFontCaption, color: secondary),
-              ),
-            ],
+          const Divider(height: 16),
+          sliderRow(
+            label: '语速',
+            value: '${(rate * 100).round()}%',
+            v: rate,
+            min: 0.2,
+            max: 0.8,
+            divisions: 12,
+            key: const ValueKey('tts-rate-slider'),
+            onChanged: (v) => setState(() => _rate = v),
+            onChangeEnd: (v) async {
+              await state.setTtsRate(v);
+              if (mounted) setState(() => _rate = null);
+            },
           ),
-          const Divider(height: 14),
-          Row(
-            children: [
-              Text('音调', style: TextStyle(fontSize: kFontBody)),
-              const SizedBox(width: 10),
-              chip(
-                label: '低沉',
-                active: (s.ttsPitch - 0.85).abs() < 0.01,
-                onTap: () => state.setTtsPitch(0.85),
-                key: const ValueKey('tts-pitch-0.85'),
-              ),
-              const SizedBox(width: 8),
-              chip(
-                label: '正常',
-                active: (s.ttsPitch - 1.0).abs() < 0.01,
-                onTap: () => state.setTtsPitch(1.0),
-                key: const ValueKey('tts-pitch-1.0'),
-              ),
-              const SizedBox(width: 8),
-              chip(
-                label: '清亮',
-                active: (s.ttsPitch - 1.15).abs() < 0.01,
-                onTap: () => state.setTtsPitch(1.15),
-                key: const ValueKey('tts-pitch-1.15'),
-              ),
-              const Spacer(),
-              Text(
-                s.ttsPitch.toStringAsFixed(2),
-                style: TextStyle(fontSize: kFontCaption, color: secondary),
-              ),
-            ],
+          const SizedBox(height: 4),
+          sliderRow(
+            label: '音调',
+            value: pitch.toStringAsFixed(2),
+            v: pitch,
+            min: 0.7,
+            max: 1.3,
+            divisions: 12,
+            key: const ValueKey('tts-pitch-slider'),
+            onChanged: (v) => setState(() => _pitch = v),
+            onChangeEnd: (v) async {
+              await state.setTtsPitch(v);
+              if (mounted) setState(() => _pitch = null);
+            },
           ),
         ],
       ),
