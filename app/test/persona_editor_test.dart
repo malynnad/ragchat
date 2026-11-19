@@ -4,6 +4,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ragchat/app/app_state.dart';
 import 'package:ragchat/app/ios_dialogs.dart';
+import 'package:ragchat/app/ios_widgets.dart';
 import 'package:ragchat/app/settings.dart';
 import 'package:ragchat/app/persona.dart';
 import 'package:ragchat/app/persona_editor.dart';
@@ -159,8 +160,14 @@ void main() {
     await tester.tap(find.text('打开'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('云端 system 一共 6000 token'), findsOneWidget);
-    expect(find.textContaining('800 token'), findsNothing);
+    // 说明收进了「!」气泡：3 个小圆圈，预算那条挂的是 6000 的文案。
+    expect(find.byType(InfoDot), findsNWidgets(3));
+    final dots = tester
+        .widgetList<InfoDot>(find.byType(InfoDot))
+        .map((d) => d.message)
+        .join('\n');
+    expect(dots, contains('云端 system 一共 6000 token'));
+    expect(dots, isNot(contains('800 token')));
     expect(saved, isNull);
   });
 

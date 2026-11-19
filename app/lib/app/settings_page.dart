@@ -299,7 +299,7 @@ class SettingsPage extends StatelessWidget {
     );
     return IosSection(
       header: '07 / STORAGE',
-      footer: '删除按钮要按满一格才会弹确认：按下去会从左往右变红，松手即取消。',
+      info: '删除按钮要按满一格才会弹确认：按下去会从左往右变红，松手即取消。',
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         children: [
@@ -333,7 +333,7 @@ class SettingsPage extends StatelessWidget {
         : 'balanced';
     return IosSection(
       header: '04 / SAMPLING',
-      footer: '温度低更稳、少跑题；高了更容易语无伦次。改完下一次生成就生效。',
+      info: '温度低更稳、少跑题；高了更容易语无伦次。改完下一次生成就生效。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -522,7 +522,7 @@ class _CloudSectionState extends State<_CloudSection> {
     final cloud = state.settings.backend == 'cloud';
     return IosSection(
       header: '05 / BACKEND',
-      footer: cloud
+      info: cloud
           ? '云端会把每轮对话、人设和记忆发给服务商；不用时切回本地。'
           : '本地模型全程离线；想用 DeepSeek 之类的大模型再切云端。',
       child: Column(
@@ -988,22 +988,28 @@ class _VoiceSectionState extends State<_VoiceSection> {
             ),
           ],
         ),
-        CupertinoSlider(
-          key: key,
-          value: v,
-          min: min,
-          max: max,
-          divisions: divisions,
-          activeColor: p.ink,
-          onChanged: onChanged,
-          onChangeEnd: onChangeEnd,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: FractionallySizedBox(
+            widthFactor: 0.5,
+            child: CupertinoSlider(
+              key: key,
+              value: v,
+              min: min,
+              max: max,
+              divisions: divisions,
+              activeColor: p.ink,
+              onChanged: onChanged,
+              onChangeEnd: onChangeEnd,
+            ),
+          ),
         ),
       ],
     );
 
     return IosSection(
       header: '06 / VOICE',
-      footer: '用手机自带的语音引擎，离线、免费、不耗流量。'
+      info: '用手机自带的语音引擎，离线、免费、不耗流量。'
           '想换发音人要去系统设置里换默认 TTS 引擎，App 里只调语速和音调。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

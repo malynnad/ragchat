@@ -132,7 +132,7 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
         children: [
           IosSection(
             header: '人设卡',
-            footer: _useRaw
+            info: _useRaw
                 ? '长人设整段塞进 system，适合云端；本地 2B/4B 会被预算截断，建议切回短人设。'
                 : '写得越短，手机端首字出得越快。形容词两三个就够，口癖比形容词更像人。',
             child: Column(
@@ -162,7 +162,7 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
           const SizedBox(height: 16),
           IosSection(
             header: '写入 system 的原文',
-            footer: '下一轮对话生效，不用重载模型。',
+            info: '下一轮对话生效，不用重载模型。',
             child: Text(
               _draft.render().isEmpty ? '（空）' : _draft.render(),
               style: TextStyle(fontSize: kFontBody, color: secondary),
@@ -224,7 +224,7 @@ class _PersonaEditorPageState extends State<PersonaEditorPage> {
     final where = cloud ? '云端' : '本地';
     return IosSection(
       header: 'system 预算（$where）',
-      footer: over
+      info: over
           ? '超过软上限了：$where system 一共 $budget token，人设占得多，长期记忆就挤不进去。'
           : '$where system 一共 $budget token，人设建议 ≤$soft，剩下留给长期记忆。',
       child: Column(

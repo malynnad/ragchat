@@ -14,12 +14,16 @@ class IosSection extends StatelessWidget {
     super.key,
     this.header,
     this.footer,
+    this.info,
     required this.child,
     this.contentPadding = const EdgeInsets.all(16),
   });
 
   final String? header;
   final String? footer;
+
+  /// 有它就不显示 footer：说明收进 header 右侧的小圆圈，点开是气泡。
+  final String? info;
   final Widget child;
   final EdgeInsets contentPadding;
 
@@ -52,12 +56,16 @@ class IosSection extends StatelessWidget {
                     color: p.ink.withValues(alpha: 0.18),
                   ),
                 ),
+                if (info != null) ...[
+                  const SizedBox(width: 8),
+                  InfoDot(message: info!),
+                ],
               ],
             ),
             const SizedBox(height: 8),
           ],
           ContentPanel(padding: contentPadding, child: child),
-          if (footer != null) ...[
+          if (footer != null && info == null) ...[
             const SizedBox(height: 8),
             Text(
               footer!,
@@ -193,4 +201,93 @@ class IosPillBar extends StatelessWidget {
       ),
     );
   }
+}
+
+
+/// 小圆圈里的「!」：点开在它下方弹一个纸卡气泡，承接原本的脚注说明。
+class InfoDot extends StatelessWidget {
+  const InfoDot({super.key, required this.message, this.size = 18});
+
+  final String message;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final p = paperOf(context);
+    return Semantics(
+      button: true,
+      label: '说明',
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: () => _showInfoBubble(context, message),
+        child: Container(
+          width: size,
+          height: size,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: p.muted, width: 1),
+          ),
+          child: Text(
+            '!',
+            style: TextStyle(
+              fontSize: size * 0.62,
+              height: 1,
+              fontWeight: FontWeight.w600,
+              color: p.muted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _showInfoBubble(BuildContext context, String message) async {
+  final box = context.findRenderObject() as RenderBox?;
+  final overlay = Overlay.of(context).context.findRenderObject() as RenderBox?;
+  if (box == null || overlay == null) return;
+  final pos = box.localToGlobal(Offset.zero, ancestor: overlay);
+  const width = 262.0;
+  final screenW = overlay.size.width;
+  final left = (pos.dx - width + box.size.width).clamp(
+    12.0,
+    screenW - width - 12,
+  );
+  var top = pos.dy + box.size.height + 8;
+  final maxTop = overlay.size.height - 180;
+  if (top > maxTop) top = pos.dy - 150;
+
+  await showGeneralDialog<void>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: '关闭说明',
+    barrierColor: Colors.transparent,
+    transitionDuration: const Duration(milliseconds: 140),
+    pageBuilder: (c, _, _) => Stack(
+      children: [
+        Positioned(
+          left: left,
+          top: top,
+          width: width,
+          child: Material(
+            color: Colors.transparent,
+            child: ContentPanel(
+              padding: const EdgeInsets.all(14),
+              child: Text(
+                message,
+                style: TextStyle(
+                  fontSize: kFontCaption,
+                  height: 1.55,
+                  color: paperOf(c).ink,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    ),
+    transitionBuilder: (c, a, _, child) =>
+        FadeTransition(opacity: a, child: child),
+  );
 }
