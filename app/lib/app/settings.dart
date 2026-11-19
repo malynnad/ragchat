@@ -22,10 +22,7 @@ class AppSettings {
     this.cloudModel = 'deepseek-flash',
     this.ttsAutoRead = false,
     this.ttsRate = 0.5,
-    this.ttsVoiceName,
-    this.ttsVoiceLocale,
     this.ttsPitch = 1.0,
-    this.ttsEngine,
   });
 
   /// ADR-0005：默认 CPU；GPU 仅作开关
@@ -70,16 +67,9 @@ class AppSettings {
   /// 系统 TTS 语速：0.1–0.9，中文 0.5 左右接近正常说话。
   double ttsRate;
 
-  /// 选中的系统音色（引擎里的 voice name + locale）；null = 引擎默认。
-  String? ttsVoiceName;
-  String? ttsVoiceLocale;
-
   /// 音调 0.7–1.3：0.85 偏低沉，1.15 偏清亮。部分引擎的音色其实同质，
   /// 这个是最直观的“换个声音”手段。
   double ttsPitch;
-
-  /// 指定 TTS 引擎（Android 引擎包名）；null = 系统默认引擎。
-  String? ttsEngine;
 
   /// 当前人设卡（列表里找不到 activePersonaId 时回退第一张）。
   PersonaCard activePersona(List<PersonaCard> cards) => cards.firstWhere(
@@ -114,10 +104,7 @@ class AppSettings {
         cloudModel: j['cloudModel'] as String? ?? 'deepseek-flash',
         ttsAutoRead: j['ttsAutoRead'] as bool? ?? false,
         ttsRate: (j['ttsRate'] as num?)?.toDouble() ?? 0.5,
-        ttsVoiceName: j['ttsVoiceName'] as String?,
-        ttsVoiceLocale: j['ttsVoiceLocale'] as String?,
         ttsPitch: (j['ttsPitch'] as num?)?.toDouble() ?? 1.0,
-        ttsEngine: j['ttsEngine'] as String?,
       );
     } catch (_) {
       return AppSettings();
@@ -141,10 +128,7 @@ class AppSettings {
         'cloudModel': cloudModel,
         'ttsAutoRead': ttsAutoRead,
         'ttsRate': ttsRate,
-        'ttsVoiceName': ttsVoiceName,
-        'ttsVoiceLocale': ttsVoiceLocale,
         'ttsPitch': ttsPitch,
-        'ttsEngine': ttsEngine,
       }),
     );
   }

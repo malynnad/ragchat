@@ -609,21 +609,7 @@ class AppState extends ChangeNotifier {
     await settings.save(_supportDir);
   }
 
-  /// 选音色：name/locale 都传 null 就是回到引擎默认。
-  Future<void> setTtsVoice(String? name, String? locale) async {
-    settings.ttsVoiceName = name;
-    settings.ttsVoiceLocale = locale;
-    notifyListeners();
-    await settings.save(_supportDir);
-  }
 
-  Future<void> setTtsEngine(String? id) async {
-    settings.ttsEngine = id;
-    settings.ttsVoiceName = null; // 换引擎后旧音色不一定存在
-    settings.ttsVoiceLocale = null;
-    notifyListeners();
-    await settings.save(_supportDir);
-  }
 
   Future<void> setTtsPitch(double value) async {
     settings.ttsPitch = value;
