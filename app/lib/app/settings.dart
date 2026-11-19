@@ -25,6 +25,7 @@ class AppSettings {
     this.ttsVoiceName,
     this.ttsVoiceLocale,
     this.ttsPitch = 1.0,
+    this.ttsEngine,
   });
 
   /// ADR-0005：默认 CPU；GPU 仅作开关
@@ -77,6 +78,9 @@ class AppSettings {
   /// 这个是最直观的“换个声音”手段。
   double ttsPitch;
 
+  /// 指定 TTS 引擎（Android 引擎包名）；null = 系统默认引擎。
+  String? ttsEngine;
+
   /// 当前人设卡（列表里找不到 activePersonaId 时回退第一张）。
   PersonaCard activePersona(List<PersonaCard> cards) => cards.firstWhere(
     (c) => c.id == activePersonaId,
@@ -113,6 +117,7 @@ class AppSettings {
         ttsVoiceName: j['ttsVoiceName'] as String?,
         ttsVoiceLocale: j['ttsVoiceLocale'] as String?,
         ttsPitch: (j['ttsPitch'] as num?)?.toDouble() ?? 1.0,
+        ttsEngine: j['ttsEngine'] as String?,
       );
     } catch (_) {
       return AppSettings();
@@ -139,6 +144,7 @@ class AppSettings {
         'ttsVoiceName': ttsVoiceName,
         'ttsVoiceLocale': ttsVoiceLocale,
         'ttsPitch': ttsPitch,
+        'ttsEngine': ttsEngine,
       }),
     );
   }

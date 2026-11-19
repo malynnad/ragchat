@@ -14,7 +14,16 @@ class TtsVoice {
     final l = label?.trim() ?? '';
     if (l.isNotEmpty) return l;
     if (RegExp(r'[\u4e00-\u9fff]').hasMatch(name)) return name;
-    return locale;
+    // 讯飞这类引擎只给 locale：翻译成人话。
+    const zh = {
+      'zh': '中文（通用）',
+      'zh-hans': '中文（简体）',
+      'zh-hant': '中文（繁体）',
+      'zh-cn': '中文（普通话）',
+      'zh-tw': '中文（台湾）',
+      'zh-hk': '中文（粤语）',
+    };
+    return zh[locale.toLowerCase()] ?? locale;
   }
 }
 
@@ -30,6 +39,7 @@ class TtsService {
   /// 朗读结束/被打断时回调，UI 用它把「停止」变回「朗读」。
   VoidCallback? onDone;
   bool _wired = false;
+  String? _engine;
 
   Future<bool> init({double rate = 0.5, double pitch = 1.0}) async {
     if (_ready) return true;
@@ -63,6 +73,44 @@ class TtsService {
       return true;
     } catch (e) {
       debugPrint('[tts] init failed: $e');
+      return false;
+    }
+  }
+
+  /// 系统里所有 TTS 引擎（包名）。装多个引擎时用。
+  Future<List<String>> listEngines() async {
+    try {
+      final raw = await _tts.getEngines.timeout(const Duration(seconds: 4));
+      final list = <String>[];
+      if (raw is List) {
+        for (final e in raw) {
+          if (e != null) list.add(e.toString());
+        }
+      }
+      debugPrint('[tts] engines=$list');
+      return list;
+    } catch (e) {
+      debugPrint('[tts] getEngines failed: $e');
+      return const [];
+    }
+  }
+
+  /// 换引擎：flutter_tts 会重启底层 TTS，之后再查音色/发音。
+  Future<bool> useEngine(String? id) async {
+    if (id == _engine) return true;
+    try {
+      _engine = id;
+      if (id != null && id.isNotEmpty) {
+        await _tts.setEngine(id).timeout(const Duration(seconds: 5));
+      } else {
+        await _tts.setEngine('').timeout(const Duration(seconds: 5));
+      }
+      _ready = false;
+      _wired = false;
+      debugPrint('[tts] engine => ${id ?? 'default'}');
+      return true;
+    } catch (e) {
+      debugPrint('[tts] setEngine failed: $e');
       return false;
     }
   }
@@ -122,6 +170,12 @@ class TtsService {
             .setVoice({'name': voiceName, 'locale': voiceLocale ?? 'zh-CN'})
             .timeout(const Duration(seconds: 3));
         debugPrint('[tts] setVoice($voiceName, $voiceLocale) => $r');
+        if (r != 1 && voiceLocale != null) {
+          // 讯飞这类引擎只按 locale 认音色：name 对不上就退回设语言。
+          await _tts.setLanguage(voiceLocale).timeout(
+            const Duration(seconds: 3),
+          );
+        }
       }
       speaking = true;
       // 启动就返回；结束靠 completion 回调，不会卡住 UI。

@@ -957,7 +957,9 @@ class _VoiceSection extends StatefulWidget {
 class _VoiceSectionState extends State<_VoiceSection> {
   final _tts = TtsService();
   List<TtsVoice>? _voices;
+  List<String>? _engines;
   bool _failed = false;
+  bool _loaded = false;
 
   @override
   void initState() {
@@ -965,14 +967,29 @@ class _VoiceSectionState extends State<_VoiceSection> {
     // 单元测试里没有插件通道：别去查音色，免得留下 pending timer。
     if (Platform.environment.containsKey('FLUTTER_TEST')) {
       _failed = true;
-      return;
+      _loaded = true;
     }
-    _tts.listVoices().then((v) {
-      if (!mounted) return;
-      setState(() {
-        _voices = v;
-        _failed = v.isEmpty;
-      });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_loaded) return;
+    _loaded = true;
+    _load();
+  }
+
+  Future<void> _load() async {
+    // 先切到设置里选中的引擎，否则列出来的是系统默认引擎的音色。
+    final saved = AppStateScope.of(context).settings.ttsEngine;
+    if (saved != null) await _tts.useEngine(saved);
+    final engines = await _tts.listEngines();
+    final voices = await _tts.listVoices();
+    if (!mounted) return;
+    setState(() {
+      _engines = engines;
+      _voices = voices;
+      _failed = voices.isEmpty;
     });
   }
 
@@ -980,6 +997,18 @@ class _VoiceSectionState extends State<_VoiceSection> {
   void dispose() {
     _tts.dispose();
     super.dispose();
+  }
+
+  /// 换引擎后立刻重查音色：不同引擎的音色列表完全不同。
+  Future<void> _pickEngine(AppState state, String? id) async {
+    await state.setTtsEngine(id);
+    await _tts.useEngine(id);
+    final v = await _tts.listVoices();
+    if (!mounted) return;
+    setState(() {
+      _voices = v;
+      _failed = v.isEmpty;
+    });
   }
 
   @override
@@ -1109,6 +1138,47 @@ class _VoiceSectionState extends State<_VoiceSection> {
               ),
             ],
           ),
+          const Divider(height: 14),
+          Row(
+            children: [
+              Text('引擎', style: TextStyle(fontSize: kFontBody)),
+              const Spacer(),
+              Text(
+                s.ttsEngine ?? '系统默认',
+                style: TextStyle(fontSize: kFontCaption, color: secondary),
+              ),
+            ],
+          ),
+          if (_engines != null && _engines!.length > 1) ...[
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                chip(
+                  label: '默认',
+                  active: s.ttsEngine == null,
+                  onTap: () => _pickEngine(state, null),
+                  key: const ValueKey('tts-engine-default'),
+                ),
+                for (final e in _engines!)
+                  chip(
+                    label: e.contains('.') ? e.split('.').last : e,
+                    active: s.ttsEngine == e,
+                    onTap: () => _pickEngine(state, e),
+                    key: ValueKey('tts-engine-$e'),
+                  ),
+              ],
+            ),
+          ] else
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                '系统里只注册了 1 个 TTS 引擎。讯飞语记是记事本，不是语音引擎；'
+                '要真换音色得装「讯飞语音引擎」这类专门的引擎。',
+                style: TextStyle(fontSize: kFontCaption, color: secondary),
+              ),
+            ),
           const Divider(height: 14),
           Row(
             children: [
