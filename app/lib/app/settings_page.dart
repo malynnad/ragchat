@@ -1080,6 +1080,38 @@ class _VoiceSectionState extends State<_VoiceSection> {
           const Divider(height: 14),
           Row(
             children: [
+              Text('音调', style: TextStyle(fontSize: kFontBody)),
+              const SizedBox(width: 10),
+              chip(
+                label: '低沉',
+                active: (s.ttsPitch - 0.85).abs() < 0.01,
+                onTap: () => state.setTtsPitch(0.85),
+                key: const ValueKey('tts-pitch-0.85'),
+              ),
+              const SizedBox(width: 8),
+              chip(
+                label: '正常',
+                active: (s.ttsPitch - 1.0).abs() < 0.01,
+                onTap: () => state.setTtsPitch(1.0),
+                key: const ValueKey('tts-pitch-1.0'),
+              ),
+              const SizedBox(width: 8),
+              chip(
+                label: '清亮',
+                active: (s.ttsPitch - 1.15).abs() < 0.01,
+                onTap: () => state.setTtsPitch(1.15),
+                key: const ValueKey('tts-pitch-1.15'),
+              ),
+              const Spacer(),
+              Text(
+                s.ttsPitch.toStringAsFixed(2),
+                style: TextStyle(fontSize: kFontCaption, color: secondary),
+              ),
+            ],
+          ),
+          const Divider(height: 14),
+          Row(
+            children: [
               Text('音色', style: TextStyle(fontSize: kFontBody)),
               const Spacer(),
               if (s.ttsVoiceName != null)

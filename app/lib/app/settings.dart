@@ -24,6 +24,7 @@ class AppSettings {
     this.ttsRate = 0.5,
     this.ttsVoiceName,
     this.ttsVoiceLocale,
+    this.ttsPitch = 1.0,
   });
 
   /// ADR-0005：默认 CPU；GPU 仅作开关
@@ -72,6 +73,10 @@ class AppSettings {
   String? ttsVoiceName;
   String? ttsVoiceLocale;
 
+  /// 音调 0.7–1.3：0.85 偏低沉，1.15 偏清亮。部分引擎的音色其实同质，
+  /// 这个是最直观的“换个声音”手段。
+  double ttsPitch;
+
   /// 当前人设卡（列表里找不到 activePersonaId 时回退第一张）。
   PersonaCard activePersona(List<PersonaCard> cards) => cards.firstWhere(
     (c) => c.id == activePersonaId,
@@ -107,6 +112,7 @@ class AppSettings {
         ttsRate: (j['ttsRate'] as num?)?.toDouble() ?? 0.5,
         ttsVoiceName: j['ttsVoiceName'] as String?,
         ttsVoiceLocale: j['ttsVoiceLocale'] as String?,
+        ttsPitch: (j['ttsPitch'] as num?)?.toDouble() ?? 1.0,
       );
     } catch (_) {
       return AppSettings();
@@ -132,6 +138,7 @@ class AppSettings {
         'ttsRate': ttsRate,
         'ttsVoiceName': ttsVoiceName,
         'ttsVoiceLocale': ttsVoiceLocale,
+        'ttsPitch': ttsPitch,
       }),
     );
   }

@@ -591,6 +591,7 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
     final ok = await _tts.speak(
       a.answer,
       rate: s.ttsRate,
+      pitch: s.ttsPitch,
       voiceName: s.ttsVoiceName,
       voiceLocale: s.ttsVoiceLocale,
     );

@@ -617,6 +617,12 @@ class AppState extends ChangeNotifier {
     await settings.save(_supportDir);
   }
 
+  Future<void> setTtsPitch(double value) async {
+    settings.ttsPitch = value;
+    notifyListeners();
+    await settings.save(_supportDir);
+  }
+
   Future<void> setTtsRate(double value) async {
     settings.ttsRate = value;
     notifyListeners();

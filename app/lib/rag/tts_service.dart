@@ -45,7 +45,9 @@ class TtsService {
       await _tts
           .setSpeechRate(rate.clamp(0.1, 0.9))
           .timeout(const Duration(seconds: 3));
-      await _tts.setPitch(pitch).timeout(const Duration(seconds: 3));
+      await _tts
+          .setPitch(pitch.clamp(0.7, 1.3))
+          .timeout(const Duration(seconds: 3));
       // 不用 awaitSpeakCompletion：OPPO 等引擎会在开始时就 resolve，
       // 导致「停止」按钮一闪就回去。改由回调驱动状态。
       if (!_wired) {
@@ -101,6 +103,7 @@ class TtsService {
   Future<bool> speak(
     String text, {
     double? rate,
+    double? pitch,
     String? voiceName,
     String? voiceLocale,
   }) async {
@@ -109,10 +112,16 @@ class TtsService {
     try {
       if (rate != null) await _tts.setSpeechRate(rate.clamp(0.1, 0.9));
       await _tts.stop().timeout(const Duration(seconds: 3));
+      if (pitch != null) {
+        await _tts.setPitch(pitch.clamp(0.7, 1.3)).timeout(
+          const Duration(seconds: 3),
+        );
+      }
       if (voiceName != null && voiceName.isNotEmpty) {
-        await _tts
+        final r = await _tts
             .setVoice({'name': voiceName, 'locale': voiceLocale ?? 'zh-CN'})
             .timeout(const Duration(seconds: 3));
+        debugPrint('[tts] setVoice($voiceName, $voiceLocale) => $r');
       }
       speaking = true;
       // 启动就返回；结束靠 completion 回调，不会卡住 UI。
