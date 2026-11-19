@@ -602,6 +602,19 @@ class AppState extends ChangeNotifier {
     }
   }
 
+  /// 系统 TTS：自动朗读开关与语速（离线，不涉及网关）。
+  Future<void> setTtsAutoRead(bool value) async {
+    settings.ttsAutoRead = value;
+    notifyListeners();
+    await settings.save(_supportDir);
+  }
+
+  Future<void> setTtsRate(double value) async {
+    settings.ttsRate = value;
+    notifyListeners();
+    await settings.save(_supportDir);
+  }
+
   /// 切换对话后端：本地 GGUF / 云端 API。人设按槽位自动跟着换，
   /// 但**两张卡的内容都不会被覆盖**——本地的改动留在本地那张，云端同理。
   Future<void> setBackend(String backend) async {

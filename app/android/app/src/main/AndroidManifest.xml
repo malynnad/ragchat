@@ -1,6 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 模型下载需要网络；模型就绪后全部功能离线可用 -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Android 11+ 需要显式声明才能发现系统 TTS 引擎（flutter_tts 用）。 -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
     <application
         android:label="RAGchat"
         android:name="${applicationName}"

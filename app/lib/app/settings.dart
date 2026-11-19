@@ -20,6 +20,8 @@ class AppSettings {
     this.backend = 'local',
     this.cloudBaseUrl = 'https://api.deepseek.com',
     this.cloudModel = 'deepseek-flash',
+    this.ttsAutoRead = false,
+    this.ttsRate = 0.5,
   });
 
   /// ADR-0005：默认 CPU；GPU 仅作开关
@@ -58,6 +60,12 @@ class AppSettings {
   /// 云端模型名：deepseek-flash（便宜快）或 deepseek-v4-pro（更强）。
   String cloudModel;
 
+  /// 新回复自动朗读（系统 TTS，离线免费）。
+  bool ttsAutoRead;
+
+  /// 系统 TTS 语速：0.1–0.9，中文 0.5 左右接近正常说话。
+  double ttsRate;
+
   /// 当前人设卡（列表里找不到 activePersonaId 时回退第一张）。
   PersonaCard activePersona(List<PersonaCard> cards) => cards.firstWhere(
     (c) => c.id == activePersonaId,
@@ -89,6 +97,8 @@ class AppSettings {
         cloudBaseUrl:
             j['cloudBaseUrl'] as String? ?? 'https://api.deepseek.com',
         cloudModel: j['cloudModel'] as String? ?? 'deepseek-flash',
+        ttsAutoRead: j['ttsAutoRead'] as bool? ?? false,
+        ttsRate: (j['ttsRate'] as num?)?.toDouble() ?? 0.5,
       );
     } catch (_) {
       return AppSettings();
@@ -110,6 +120,8 @@ class AppSettings {
         'backend': backend,
         'cloudBaseUrl': cloudBaseUrl,
         'cloudModel': cloudModel,
+        'ttsAutoRead': ttsAutoRead,
+        'ttsRate': ttsRate,
       }),
     );
   }

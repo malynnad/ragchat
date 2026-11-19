@@ -6,7 +6,6 @@ import 'package:ragchat/app/app_state.dart';
 import 'package:ragchat/app/ios_dialogs.dart';
 import 'package:ragchat/app/settings.dart';
 import 'package:ragchat/app/persona.dart';
-import 'package:ragchat/app/persona.dart';
 import 'package:ragchat/app/persona_editor.dart';
 import 'package:ragchat/app/theme.dart';
 

@@ -41,7 +41,77 @@ class SettingsPage extends StatelessWidget {
           const SizedBox(height: 28),
           const _CloudSection(),
           const SizedBox(height: 28),
+          _voiceSection(context, state),
+          const SizedBox(height: 28),
           _storageSection(context, state, stats),
+        ],
+      ),
+    );
+  }
+
+  /// 系统 TTS：离线朗读，不联网、不要 key。
+  Widget _voiceSection(BuildContext context, AppState state) {
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final rate = state.settings.ttsRate;
+    Widget rateChip(String label, double value) {
+      final active = (rate - value).abs() < 0.01;
+      return CupertinoButton(
+        key: ValueKey('tts-rate-$value'),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        minimumSize: Size.zero,
+        color: active
+            ? paperOf(context).ink
+            : CupertinoColors.tertiarySystemFill.resolveFrom(context),
+        onPressed: () => state.setTtsRate(value),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: kFontCaption,
+            color: active ? paperOf(context).milk : paperOf(context).ink,
+          ),
+        ),
+      );
+    }
+
+    return IosSection(
+      header: '06 / VOICE',
+      footer:
+          '用手机自带的语音引擎，离线、免费、不耗流量。'
+          '觉得机械就去应用商店装一个中文 TTS 引擎，再回来点「朗读」。',
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '新回复自动朗读',
+                  style: TextStyle(fontSize: kFontBody),
+                ),
+              ),
+              CupertinoSwitch(
+                key: const ValueKey('tts-auto-read'),
+                value: state.settings.ttsAutoRead,
+                onChanged: (v) => state.setTtsAutoRead(v),
+              ),
+            ],
+          ),
+          const Divider(height: 14),
+          Row(
+            children: [
+              Text('语速', style: TextStyle(fontSize: kFontBody)),
+              const SizedBox(width: 10),
+              rateChip('慢', 0.35),
+              const SizedBox(width: 8),
+              rateChip('正常', 0.5),
+              const SizedBox(width: 8),
+              rateChip('快', 0.65),
+              const Spacer(),
+              Text(
+                '${(rate * 100).round()}%',
+                style: TextStyle(fontSize: kFontCaption, color: secondary),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -296,7 +366,7 @@ class SettingsPage extends StatelessWidget {
       ),
     );
     return IosSection(
-      header: '06 / STORAGE',
+      header: '07 / STORAGE',
       footer: '删除按钮要按满一格才会弹确认：按下去会从左往右变红，松手即取消。',
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(

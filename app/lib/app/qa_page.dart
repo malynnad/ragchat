@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../rag/models.dart';
+import '../rag/tts_service.dart';
 import 'app_state.dart';
 import 'ios_dialogs.dart';
 import 'paper.dart';
@@ -46,6 +47,10 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
   StreamSubscription<AnswerEvent>? _sub;
   Timer? _watchdog;
   bool _restored = false;
+
+  /// 系统 TTS：正在朗读的那条（同一时间只读一条）。
+  final _tts = TtsService();
+  _AssistantEntry? _speaking;
 
   /// 「新对话」动作总线订阅（保留接缝，供外部触发）。
   AppState? _busState;
@@ -174,6 +179,11 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
               });
               _scrollToBottom();
               if (e is AnswerContextFull) _showContextFullDialog();
+              if (e is AnswerDone &&
+                  assistant.answer.isNotEmpty &&
+                  state.settings.ttsAutoRead) {
+                _speak(assistant);
+              }
             },
             onError: (Object e) {
               if (!mounted) return;
@@ -517,6 +527,30 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
             ),
           const Spacer(),
           CupertinoButton(
+            key: const ValueKey('speak-answer'),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            minimumSize: Size.zero,
+            onPressed: () => _toggleSpeak(a),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _speaking == a
+                      ? CupertinoIcons.stop_fill
+                      : CupertinoIcons.speaker_2,
+                  size: 14,
+                  color: secondary,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _speaking == a ? '停止' : '朗读',
+                  style: TextStyle(fontSize: kFontCaption, color: secondary),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 4),
+          CupertinoButton(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             minimumSize: Size.zero,
             onPressed: () => _copyAnswer(a),
@@ -535,6 +569,31 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
         ],
       ),
     );
+  }
+
+  Future<void> _toggleSpeak(_AssistantEntry a) async {
+    if (_speaking == a) {
+      await _tts.stop();
+      if (mounted) setState(() => _speaking = null);
+      return;
+    }
+    await _speak(a);
+  }
+
+  Future<void> _speak(_AssistantEntry a) async {
+    if (!mounted) return;
+    final rate = AppStateScope.of(context).settings.ttsRate;
+    setState(() => _speaking = a);
+    final ok = await _tts.speak(a.answer, rate: rate);
+    if (!mounted) return;
+    if (!ok) {
+      setState(() => _speaking = null);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('这台手机没有可用的语音引擎，装一个系统 TTS 就行')),
+      );
+      return;
+    }
+    setState(() => _speaking = null);
   }
 
   Future<void> _copyAnswer(_AssistantEntry a) async {

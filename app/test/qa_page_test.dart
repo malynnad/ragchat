@@ -66,6 +66,29 @@ void main() {
     expect(find.text('你叫Danny。'), findsOneWidget);
   });
 
+  testWidgets('助手气泡有朗读按钮，点一下不会炸', (tester) async {
+    final (state, _) = await buildState();
+    state.sessionTurns.add(
+      const SessionTurn(question: '在吗', answer: '在呢。'),
+    );
+
+    await tester.pumpWidget(wrap(state));
+    await tester.pump();
+
+    expect(find.text('朗读'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('speak-answer')));
+    await tester.pump();
+    // 测试环境没有引擎：插件调用会失败/超时，这里等它走完回落。
+    for (var i = 0; i < 40; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      if (find.text('朗读').evaluate().isNotEmpty) break;
+    }
+
+    // 测试环境没有 TTS 引擎：只要求不抛异常、不卡在「朗读中」。
+    expect(tester.takeException(), isNull);
+    expect(find.text('朗读'), findsOneWidget);
+  });
+
   testWidgets('发送后清空输入框，完成轮次写入当前会话', (tester) async {
     final (state, gateway) = await buildState();
     gateway.nextResponse = '我记住了。';
