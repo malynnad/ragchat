@@ -73,13 +73,37 @@ class SessionRecord {
 /// App 数据库接缝：memories / sessions / turns（schema v3，ADR-0009）。
 /// 由 RAG 时代的 rag.db 演进：v1/v2 表（documents/chunks/categories/meta）
 /// 保留不动——代码删、数据留（ADR-0009 决策 1）。
+/// 用量合计（今日 / 累计）。
+class UsageSummary {
+  const UsageSummary({
+    required this.promptTokens,
+    required this.completionTokens,
+    required this.cost,
+    required this.count,
+  });
+
+  final int promptTokens;
+  final int completionTokens;
+  final double cost;
+  final int count;
+
+  int get totalTokens => promptTokens + completionTokens;
+
+  static const empty = UsageSummary(
+    promptTokens: 0,
+    completionTokens: 0,
+    cost: 0,
+    count: 0,
+  );
+}
+
 /// 迁移沿用 VectorStore 模式：onCreate/onUpgrade 共用幂等 _createSchema。
 class AppDb {
   AppDb._(this._db);
 
   final Database _db;
 
-  static const int schemaVersion = 3;
+  static const int schemaVersion = 4;
 
   /// 打开（或升级）持久化库。旧 v2 库（RAG 版覆盖安装）自动升 v3，数据完好。
   static Future<AppDb> openFile(String path) async {
@@ -141,6 +165,16 @@ class AppDb {
       CREATE TABLE IF NOT EXISTS meta(
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+      )''');
+    // ---- v4（云端用量账本）----
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS usage_log(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ts INTEGER NOT NULL,
+        model TEXT NOT NULL,
+        prompt_tokens INTEGER NOT NULL,
+        completion_tokens INTEGER NOT NULL,
+        cost REAL NOT NULL DEFAULT 0
       )''');
     // ---- v3（陪聊：记忆 + 会话）----
     await db.execute('''
@@ -335,6 +369,51 @@ class AppDb {
       await txn.delete('turns');
       await txn.delete('sessions');
     });
+  }
+
+  /// 记一笔云端用量（token + 估算费用）。
+  Future<void> insertUsage({
+    required String model,
+    required int promptTokens,
+    required int completionTokens,
+    required double cost,
+    DateTime? at,
+  }) async {
+    await _db.insert('usage_log', {
+      'ts': (at ?? DateTime.now()).millisecondsSinceEpoch,
+      'model': model,
+      'prompt_tokens': promptTokens,
+      'completion_tokens': completionTokens,
+      'cost': cost,
+    });
+  }
+
+  /// 从 [since] 起的用量合计；不传就是全部。
+  Future<UsageSummary> usageSince(DateTime? since) async {
+    final rows = await _db.query(
+      'usage_log',
+      where: since == null ? null : 'ts >= ?',
+      whereArgs: since == null ? null : [since.millisecondsSinceEpoch],
+    );
+    var prompt = 0, completion = 0, count = 0;
+    var cost = 0.0;
+    for (final r in rows) {
+      prompt += (r['prompt_tokens'] as int?) ?? 0;
+      completion += (r['completion_tokens'] as int?) ?? 0;
+      cost += ((r['cost'] as num?) ?? 0).toDouble();
+      count++;
+    }
+    return UsageSummary(
+      promptTokens: prompt,
+      completionTokens: completion,
+      cost: cost,
+      count: count,
+    );
+  }
+
+  /// 清空用量账本（「删除全部聊天数据」时一起清）。
+  Future<void> deleteAllUsage() async {
+    await _db.delete('usage_log');
   }
 
   static int _now() => DateTime.now().millisecondsSinceEpoch;

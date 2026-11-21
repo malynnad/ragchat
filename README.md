@@ -167,6 +167,10 @@ flutter build apk --release
 - [docs/specs](docs/specs) — 需求与验收
 - [docs/工作原理与模型选型.md](docs/工作原理与模型选型.md) — 早期模型对比记录
 
+## 待办
+
+见 [docs/TODO.md](docs/TODO.md)。
+
 ## 已知限制
 
 - 2B 模型会跑题、会复读；温度调低能缓解，不能根治。**思考功能不可用**，已固定关闭。

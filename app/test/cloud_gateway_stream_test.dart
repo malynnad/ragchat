@@ -36,6 +36,14 @@ void main() {
         );
         await req.response.flush();
       }
+      req.response.add(
+        utf8.encode(
+          'data: ${jsonEncode({
+            'choices': [],
+            'usage': {'prompt_tokens': 120, 'completion_tokens': 8},
+          })}\n\n',
+        ),
+      );
       req.response.add(utf8.encode('data: [DONE]\n\n'));
       await req.response.close();
     });
@@ -64,6 +72,13 @@ void main() {
     expect(seenBody['temperature'], 0.5);
     final messages = seenBody['messages'] as List<dynamic>;
     expect((messages.first as Map)['role'], 'system');
+    expect(
+      (seenBody['stream_options'] as Map)['include_usage'],
+      isTrue,
+      reason: '要拿 usage 必须在请求里开 include_usage',
+    );
+    expect(gateway.lastUsage?.promptTokens, 120);
+    expect(gateway.lastUsage?.completionTokens, 8);
     await gateway.dispose();
   });
 

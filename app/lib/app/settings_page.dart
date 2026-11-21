@@ -3,7 +3,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 
+import '../chat/app_db.dart';
 import '../rag/model_catalog.dart';
+import '../rag/pricing.dart';
 import '../rag/token_budget.dart';
 import 'app_state.dart';
 import 'format.dart';
@@ -481,6 +483,34 @@ class _CloudSectionState extends State<_CloudSection> {
     }
   }
 
+  /// 用量一行：token 与估算费用（按闲时价）。
+  Widget _usageRow(String label, UsageSummary u, dynamic p, {bool withCount = false}) {
+    final muted = CupertinoColors.secondaryLabel.resolveFrom(context);
+    final text = u.count == 0
+        ? '还没有记录'
+        : '↑${formatTokens(u.promptTokens)} ↓${formatTokens(u.completionTokens)}'
+              ' · ≈${formatCost(u.cost)}'
+              '${withCount ? '（${u.count} 次）' : ''}';
+    return Row(
+      children: [
+        SizedBox(
+          width: 36,
+          child: Text(
+            label,
+            style: TextStyle(fontSize: kFontCaption, color: muted),
+          ),
+        ),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: kFontCaption,
+            color: u.count == 0 ? muted : paperOf(context).ink,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _field(String label, TextEditingController c, {bool obscure = false}) {
     final p = paperOf(context);
     return Padding(
@@ -603,6 +633,14 @@ class _CloudSectionState extends State<_CloudSection> {
                   style: TextStyle(fontSize: kFontCode, color: p.muted),
                 ),
               ),
+            const Divider(height: 18),
+            _usageRow(
+              '今日',
+              state.todayUsage,
+              p,
+            ),
+            const SizedBox(height: 4),
+            _usageRow('累计', state.totalUsage, p, withCount: true),
           ],
         ],
       ),

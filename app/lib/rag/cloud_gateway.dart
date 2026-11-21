@@ -53,7 +53,25 @@ String? parseSseLine(String line) {
   }
 }
 
-class CloudGateway implements ChatGateway {
+/// 解析 SSE 里的 usage（DeepSeek / OpenAI 在最后一个 chunk 带）。
+TokenUsage? parseSseUsage(String line) {
+  if (!line.startsWith('data:')) return null;
+  final payload = line.substring(5).trim();
+  if (payload.isEmpty || payload == '[DONE]') return null;
+  try {
+    final json = jsonDecode(payload) as Map<String, dynamic>;
+    final usage = json['usage'];
+    if (usage is! Map<String, dynamic>) return null;
+    final prompt = (usage['prompt_tokens'] as num?)?.toInt() ?? 0;
+    final completion = (usage['completion_tokens'] as num?)?.toInt() ?? 0;
+    if (prompt == 0 && completion == 0) return null;
+    return TokenUsage(promptTokens: prompt, completionTokens: completion);
+  } catch (_) {
+    return null;
+  }
+}
+
+class CloudGateway implements ChatGateway, UsageReporting {
   CloudGateway({
     required this.baseUrl,
     required this.apiKey,
@@ -73,6 +91,10 @@ class CloudGateway implements ChatGateway {
   HttpClient? _client;
   bool _stopped = false;
 
+  /// 最近一次生成的 token 用量（带 include_usage 请求后由服务端返回）。
+  @override
+  TokenUsage? lastUsage;
+
   Uri get _endpoint {
     final base = baseUrl.endsWith('/')
         ? baseUrl.substring(0, baseUrl.length - 1)
@@ -83,6 +105,7 @@ class CloudGateway implements ChatGateway {
   @override
   Stream<String> generate(List<ChatMessage> messages) async* {
     _stopped = false;
+    lastUsage = null;
     final client = _client ??= (_clientFactory()
       ..connectionTimeout = const Duration(seconds: 20));
     try {
@@ -95,6 +118,8 @@ class CloudGateway implements ChatGateway {
           'model': model,
           'messages': toApiMessages(messages),
           'stream': true,
+          // 让服务端在最后一个 chunk 带上 usage（DeepSeek/OpenAI 都支持）。
+          'stream_options': {'include_usage': true},
           'temperature': temperature,
         }),
       );
@@ -113,6 +138,8 @@ class CloudGateway implements ChatGateway {
           .transform(const LineSplitter());
       await for (final line in lines) {
         if (_stopped) return;
+        final usage = parseSseUsage(line);
+        if (usage != null) lastUsage = usage;
         final text = parseSseLine(line);
         if (text != null) yield text;
       }

@@ -13,6 +13,7 @@ import '../rag/model_catalog.dart';
 import '../chat/chat_service.dart';
 import '../chat/memory_service.dart';
 import '../rag/models.dart';
+import '../rag/pricing.dart';
 import '../rag/cloud_gateway.dart';
 import '../rag/nobodywho_gateway.dart';
 import '../rag/secret_store.dart';
@@ -100,6 +101,7 @@ class AppState extends ChangeNotifier {
     await normalizePersonaSlots();
     await upgradeLocalPersona();
     _db = await AppDb.openFile(p.join(_supportDir, 'rag.db'));
+    await refreshUsageStats();
     final ext = await getExternalStorageDirectory();
     modelsDirPath = p.join(ext!.path, 'models');
     await rescanModels();
@@ -718,9 +720,41 @@ class AppState extends ChangeNotifier {
     await reloadModels();
   }
 
-  /// 清空数据：会话历史 + 记忆（存储统计入口用）。
+  /// 云端用量：今日 / 累计（设置页展示）。
+  UsageSummary todayUsage = UsageSummary.empty;
+  UsageSummary totalUsage = UsageSummary.empty;
+
+  /// 从账本重新算今日与累计。
+  Future<void> refreshUsageStats() async {
+    final db = _db;
+    if (db == null) return;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    todayUsage = await db.usageSince(today);
+    totalUsage = await db.usageSince(null);
+    notifyListeners();
+  }
+
+  /// 记一轮云端用量：token 照实记，价格认不出就记 0。
+  Future<void> recordUsage(String model, TokenUsage usage) async {
+    final db = _db;
+    if (db == null) return;
+    final cost = estimateCost(model, usage) ?? 0;
+    await db.insertUsage(
+      model: model,
+      promptTokens: usage.promptTokens,
+      completionTokens: usage.completionTokens,
+      cost: cost,
+    );
+    await refreshUsageStats();
+  }
+
+  /// 清空数据：会话历史 + 记忆 + 用量账本（存储统计入口用）。
   Future<void> clearAllData() async {
     await _db?.deleteAllSessions();
+    await _db?.deleteAllUsage();
+    todayUsage = UsageSummary.empty;
+    totalUsage = UsageSummary.empty;
     for (final m in memories) {
       await _db!.deleteMemory(m.id);
     }

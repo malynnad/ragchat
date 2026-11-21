@@ -80,6 +80,34 @@ void main() {
     expect(state.entered, isTrue);
   });
 
+  test('云端用量记账：今日/累计随记录增长，清空聊天一起清', () async {
+    final db = await openTestDb(inIsolate: false);
+    final state = AppState();
+    state.debugDb = db;
+    addTearDown(db.close);
+
+    await state.recordUsage(
+      'deepseek-flash',
+      const TokenUsage(promptTokens: 1500, completionTokens: 300),
+    );
+    expect(state.totalUsage.count, 1);
+    expect(state.totalUsage.promptTokens, 1500);
+    expect(state.totalUsage.completionTokens, 300);
+    expect(state.totalUsage.cost, closeTo(0.0027, 1e-9));
+    expect(state.todayUsage.count, 1);
+
+    await state.recordUsage(
+      'deepseek-v4-pro',
+      const TokenUsage(promptTokens: 1000, completionTokens: 100),
+    );
+    expect(state.totalUsage.count, 2);
+    expect(state.totalUsage.cost, closeTo(0.0027 + 0.00585, 1e-6));
+
+    await state.clearAllData();
+    expect(state.totalUsage.count, 0);
+    expect(state.todayUsage.count, 0);
+  });
+
   test('本地 system 不带口癖原文，云端才带（9B 会照抄开头）', () async {
     final dir = await Directory.systemTemp.createTemp('ragchat-catch');
     addTearDown(() => dir.delete(recursive: true));

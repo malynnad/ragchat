@@ -19,6 +19,12 @@ abstract interface class ChatGateway {
   Future<void> dispose();
 }
 
+/// 可选用量上报：云端网关实现它，本地网关没有这个概念。
+abstract interface class UsageReporting {
+  /// 最近一次生成的用量；失败/未返回时为 null。
+  TokenUsage? get lastUsage;
+}
+
 /// 嵌入网关接缝（v2 情景记忆用；MVP 不要求实现）。
 abstract interface class EmbedGateway {
   Future<Float32List> embed(String text);

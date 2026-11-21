@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../rag/models.dart';
+import '../rag/pricing.dart';
 import '../rag/tts_service.dart';
 import 'app_state.dart';
 import 'ios_dialogs.dart';
@@ -37,6 +38,9 @@ class _AssistantEntry {
   bool timedOut = false;
   DateTime? startedAt;
   Duration? elapsed;
+
+  /// 云端返回的 token 用量（本地模型为 null）。
+  TokenUsage? usage;
 }
 
 class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
@@ -162,6 +166,12 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
                   assistant.elapsed = assistant.startedAt == null
                       ? null
                       : DateTime.now().difference(assistant.startedAt!);
+                  assistant.usage = service.lastUsage;
+                  final usage = assistant.usage;
+                  if (usage != null && state.settings.backend == 'cloud') {
+                    // 账本只记云端：本地模型不花钱。
+                    state.recordUsage(state.settings.cloudModel, usage);
+                  }
                   _busy = false;
                   // 空回答不进历史（避免污染记忆提取与预算）。
                   if (assistant.answer.isNotEmpty) {
@@ -529,6 +539,13 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
               '耗时 ${secs}s',
               style: TextStyle(fontSize: kFontCaption, color: secondary),
             ),
+          if (a.usage != null) ...[
+            const SizedBox(width: 8),
+            Text(
+              _usageLabel(a.usage!),
+              style: TextStyle(fontSize: kFontCaption, color: secondary),
+            ),
+          ],
           const Spacer(),
           CupertinoButton(
             key: const ValueKey('speak-answer'),
@@ -574,6 +591,10 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
       ),
     );
   }
+
+  /// 云端用量：只显示 token，钱在设置页看。
+  String _usageLabel(TokenUsage u) =>
+      '↑${formatTokens(u.promptTokens)} ↓${formatTokens(u.completionTokens)}';
 
   Future<void> _toggleSpeak(_AssistantEntry a) async {
     if (_speaking == a) {

@@ -19,6 +19,16 @@ class SessionTurn {
   final String answer;
 }
 
+/// 云端返回的用量（OpenAI 兼容的 usage 字段）。
+class TokenUsage {
+  const TokenUsage({required this.promptTokens, required this.completionTokens});
+
+  final int promptTokens;
+  final int completionTokens;
+
+  int get totalTokens => promptTokens + completionTokens;
+}
+
 /// 问答事件流（US-18：流式 + 容量 + 错误）。
 sealed class AnswerEvent {}
 

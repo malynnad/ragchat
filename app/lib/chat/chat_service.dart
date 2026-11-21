@@ -21,6 +21,10 @@ class ChatService {
   /// 模型上下文容量（ADR-0006 预算预检用）。
   final int contextSize;
 
+  /// 最近一轮的云端用量；本地网关返回 null。
+  TokenUsage? get lastUsage =>
+      gateway is UsageReporting ? (gateway as UsageReporting).lastUsage : null;
+
   /// system 消息组装（ADR-0009 决策 8，公开供测试断言）：
   /// 人设卡渲染在前，核心记忆清单在后（[memories] 应已按 importance 排序）。
   /// 预算 [budget] 内截断：保证人设卡完整，记忆按序装入，装不下不硬塞。
