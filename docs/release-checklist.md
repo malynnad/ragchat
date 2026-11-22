@@ -71,8 +71,10 @@ git tag -a v1.2.0 -m "RAGchat 1.2.0（正式签名）"
 
 git push gitee main
 git push gitcode main
+git push github main
 git push gitee v1.2.0
 git push gitcode v1.2.0
+git push github v1.2.0
 ```
 
 ## 6. 移动已有 tag（只在「还没发过」时用）
@@ -90,7 +92,7 @@ git push gitcode v1.2.0
 
 ## 7. 平台上建 Release
 
-两边一样：选 tag `v1.2.0` → 标题 `RAGchat 1.2.0` → 粘贴 release notes → 上传 `RAGchat-1.2.0-arm64.apk` → **等上传进度走完** → 点发布（别存草稿）。
+三个平台一样：选 tag `v1.2.0` → 标题 `RAGchat 1.2.0` → 粘贴 release notes → 上传 `RAGchat-1.2.0-arm64.apk` → **等上传进度走完** → 点发布（别存草稿）。
 
 ## 8. 复核（发完必做）
 
