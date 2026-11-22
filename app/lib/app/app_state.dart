@@ -720,6 +720,24 @@ class AppState extends ChangeNotifier {
     await reloadModels();
   }
 
+  /// 本地后端发给模型的最近历史：从最新往前取，控制在 token 预算内
+  /// （9B 上下文一长，prefill 会拖到分钟级，见 docs/9B-review.md）。
+  List<SessionTurn> promptHistory({
+    int maxTokens = 3600,
+    int maxTurns = 10,
+  }) {
+    final picked = <SessionTurn>[];
+    var used = 0;
+    for (final t in sessionTurns.reversed) {
+      if (picked.length >= maxTurns) break;
+      final cost = estimateTokens(t.question) + estimateTokens(t.answer);
+      if (picked.isNotEmpty && used + cost > maxTokens) break;
+      picked.add(t);
+      used += cost;
+    }
+    return picked.reversed.toList();
+  }
+
   /// 云端用量：今日 / 累计（设置页展示）。
   UsageSummary todayUsage = UsageSummary.empty;
   UsageSummary totalUsage = UsageSummary.empty;

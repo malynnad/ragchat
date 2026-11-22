@@ -80,6 +80,24 @@ void main() {
     expect(state.entered, isTrue);
   });
 
+  test('本地历史只带最近 N 轮且在 token 预算内', () async {
+    final state = AppState();
+    for (var i = 1; i <= 15; i++) {
+      state.sessionTurns.add(
+        SessionTurn(
+          question: '第$i轮问题',
+          answer: '第$i轮回答' * 20,
+        ),
+      );
+    }
+    final r = state.promptHistory(maxTokens: 300, maxTurns: 10);
+    expect(r.length, lessThanOrEqualTo(10));
+    expect(r.isNotEmpty, isTrue);
+    expect(r.last.question, '第15轮问题');
+    // 预算小：只应带最后一两轮。
+    expect(r.length, lessThan(15));
+  });
+
   test('云端用量记账：今日/累计随记录增长，清空聊天一起清', () async {
     final db = await openTestDb(inIsolate: false);
     final state = AppState();

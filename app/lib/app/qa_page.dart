@@ -50,6 +50,7 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
   bool _busy = false;
   StreamSubscription<AnswerEvent>? _sub;
   Timer? _watchdog;
+  Timer? _hardWatchdog;
   bool _restored = false;
 
   /// 系统 TTS：正在朗读的那条（同一时间只读一条）。
@@ -153,15 +154,22 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
           .ask(
             q,
             systemPrompt: state.systemPrompt(),
-            history: state.sessionTurns.toList(),
+            history: state.settings.backend == 'cloud'
+                ? state.sessionTurns.toList()
+                : state.promptHistory(),
           )
           .listen(
             (e) {
               if (!mounted) return;
               setState(() {
-                if (e is AnswerToken) assistant.answer += e.text;
+                if (e is AnswerToken) {
+                  assistant.answer += e.text;
+                  // 有字就续命：只要还在吐字，就不算卡住。
+                  _armWatchdog(assistant);
+                }
                 if (e is AnswerDone) {
                   _watchdog?.cancel();
+                  _hardWatchdog?.cancel();
                   assistant.busy = false;
                   assistant.elapsed = assistant.startedAt == null
                       ? null
@@ -180,12 +188,14 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
                 }
                 if (e is AnswerContextFull) {
                   _watchdog?.cancel();
+                  _hardWatchdog?.cancel();
                   assistant.contextFull = true;
                   assistant.busy = false;
                   _busy = false;
                 }
                 if (e is AnswerError) {
                   _watchdog?.cancel();
+                  _hardWatchdog?.cancel();
                   assistant.error = true;
                   assistant.busy = false;
                   _busy = false;
@@ -218,20 +228,37 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
     }
   }
 
-  /// 生成看门狗：本地模型偶尔会长时间自言自语，60s 还没完就停掉。
+  /// 卡住判定：45 秒没新 token 就停；另设 10 分钟硬上限防死循环。
+  /// 本地 9B 的 prefill 可能超过一分钟，按总时长计时会误杀正常轮次。
+  static const _idleTimeout = Duration(seconds: 45);
+  static const _hardTimeout = Duration(minutes: 10);
+
   void _startWatchdog(_AssistantEntry assistant) {
-    _watchdog?.cancel();
-    _watchdog = Timer(const Duration(seconds: 60), () {
+    _armWatchdog(assistant);
+    _hardWatchdog?.cancel();
+    _hardWatchdog = Timer(_hardTimeout, () {
       if (!mounted || !assistant.busy) return;
-      AppStateScope.of(context).stopGeneration();
-      setState(() {
-        assistant.timedOut = true;
-        assistant.busy = false;
-        _busy = false;
-        assistant.elapsed = assistant.startedAt == null
-            ? null
-            : DateTime.now().difference(assistant.startedAt!);
-      });
+      _stopTimedOut(assistant);
+    });
+  }
+
+  void _armWatchdog(_AssistantEntry assistant) {
+    _watchdog?.cancel();
+    _watchdog = Timer(_idleTimeout, () {
+      if (!mounted || !assistant.busy) return;
+      _stopTimedOut(assistant);
+    });
+  }
+
+  void _stopTimedOut(_AssistantEntry assistant) {
+    AppStateScope.of(context).stopGeneration();
+    setState(() {
+      assistant.timedOut = true;
+      assistant.busy = false;
+      _busy = false;
+      assistant.elapsed = assistant.startedAt == null
+          ? null
+          : DateTime.now().difference(assistant.startedAt!);
     });
   }
 
@@ -480,10 +507,8 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
             if (a.timedOut)
               _noticeRow(
                 icon: CupertinoIcons.hourglass,
-                text: a.elapsed == null
-                    ? '生成太久，已自动停止。'
-                    : '生成超过 ${a.elapsed!.inSeconds} 秒，已自动停止。'
-                          '把「随机性」调到稳定再试。',
+                text: '生成卡住了，已自动停止。'
+                    '把「随机性」调到稳定，或开个新对话再试。',
               ),
             if (a.error)
               _noticeRow(
