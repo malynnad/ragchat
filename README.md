@@ -9,6 +9,24 @@
 | --- | --- | --- |
 | ![聊天](docs/screenshots/chat.png) | ![记忆](docs/screenshots/memory.png) | ![设置](docs/screenshots/settings.png) |
 
+## 下载
+
+最新版本 **1.2.0**（arm64，约 45 MB）：
+
+- **Gitee**：<https://gitee.com/dannylam/ragchat/releases/tag/v1.2.0>
+- **GitCode**：<https://gitcode.com/DannyLam/ragchat/releases/v1.2.0>
+
+直链（点开就开始下载）：
+
+- Gitee：<https://gitee.com/dannylam/ragchat/releases/download/v1.2.0/RAGchat-1.2.0-arm64.apk>
+- GitCode：<https://gitcode.com/DannyLam/ragchat/releases/download/v1.2.0/RAGchat-1.2.0-arm64.apk>
+
+```
+sha256  d6fe1b7c2aaad12f57e4cec3daca86fc31f86076e37958838cab37dcb61de1dc
+```
+
+GitHub 只镜像代码和 tag，APK 走上面两个国内源（GitHub 上传慢，也省得两边各传一遍）。
+
 仓库：
 
 - Gitee（主）：<https://gitee.com/dannylam/ragchat>
