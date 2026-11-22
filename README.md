@@ -1,5 +1,7 @@
 # RAGchat
 
+> **下载 1.2.0（arm64，45 MB）**：[Gitee](https://gitee.com/dannylam/ragchat/releases/tag/v1.2.0) · [GitCode](https://gitcode.com/DannyLam/ragchat/releases/v1.2.0)　｜　sha256 `d6fe1b7c…cde1dc`
+
 本地优先的**记忆陪聊 App**：模型默认在手机端跑，聊天记录、记忆、人设全部留在本机，不联网也能用；想要更强的对话可以随时切到云端 API。
 
 界面按「纸页与档案」设计语言做成一本摊开的档案册——暖白纸面、编号与细线、克制的玻璃。  
