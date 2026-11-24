@@ -1,6 +1,6 @@
 # RAGchat
 
-> **下载 1.2.0（arm64，45 MB）**：[Gitee](https://gitee.com/dannylam/ragchat/releases/tag/v1.2.0) · [GitCode](https://gitcode.com/DannyLam/ragchat/releases/v1.2.0)　｜　sha256 `d6fe1b7c…cde1dc`
+> **下载 1.3.0（arm64，45 MB）**：[Gitee](https://gitee.com/dannylam/ragchat/releases/tag/v1.3.0) · [GitCode](https://gitcode.com/DannyLam/ragchat/releases/v1.3.0)　｜　sha256 `80b6f818…cb8e6d`
 
 本地优先的**记忆陪聊 App**：模型默认在手机端跑，聊天记录、记忆、人设全部留在本机，不联网也能用；想要更强的对话可以随时切到云端 API。
 
@@ -15,16 +15,16 @@
 
 最新版本 **1.2.0**（arm64，约 45 MB）：
 
-- **Gitee**：<https://gitee.com/dannylam/ragchat/releases/tag/v1.2.0>
-- **GitCode**：<https://gitcode.com/DannyLam/ragchat/releases/v1.2.0>
+- **Gitee**：<https://gitee.com/dannylam/ragchat/releases/tag/v1.3.0>
+- **GitCode**：<https://gitcode.com/DannyLam/ragchat/releases/v1.3.0>
 
 直链（点开就开始下载）：
 
-- Gitee：<https://gitee.com/dannylam/ragchat/releases/download/v1.2.0/RAGchat-1.2.0-arm64.apk>
-- GitCode：<https://gitcode.com/DannyLam/ragchat/releases/download/v1.2.0/RAGchat-1.2.0-arm64.apk>
+- Gitee：<https://gitee.com/dannylam/ragchat/releases/download/v1.3.0/RAGchat-1.3.0-arm64.apk>
+- GitCode：<https://gitcode.com/DannyLam/ragchat/releases/download/v1.3.0/RAGchat-1.3.0-arm64.apk>
 
 ```
-sha256  d6fe1b7c2aaad12f57e4cec3daca86fc31f86076e37958838cab37dcb61de1dc
+sha256  80b6f818f7a3d09a860953fd22f58a2e8c6b1fff880eb5f367527241d3cb8e6d
 ```
 
 GitHub 只镜像代码和 tag，APK 走上面两个国内源（GitHub 上传慢，也省得两边各传一遍）。
