@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
@@ -12,12 +13,15 @@ import '../chat/app_db.dart';
 import '../rag/model_catalog.dart';
 import '../chat/chat_service.dart';
 import '../chat/memory_service.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
 import '../rag/models.dart';
 import '../rag/pricing.dart';
 import '../rag/cloud_gateway.dart';
 import '../rag/nobodywho_gateway.dart';
 import '../rag/secret_store.dart';
 import '../rag/token_budget.dart';
+import 'backup.dart';
 import 'persona.dart';
 import 'settings.dart';
 
@@ -718,6 +722,35 @@ class AppState extends ChangeNotifier {
     settings.useGpu = value;
     await settings.save(_supportDir);
     await reloadModels();
+  }
+
+  /// 打包当前数据为 .ragchat.zip 字节（不含 key / 模型路径）。
+  Future<Uint8List> exportBackupBytes() async {
+    final db = _db;
+    if (db == null) throw StateError('数据库还没准备好');
+    final info = await PackageInfo.fromPlatform();
+    return buildBackup(
+      db: db,
+      settings: settings,
+      appVersion: info.version,
+    );
+  }
+
+  /// 导入备份：覆盖会话与记忆、写回白名单设置，再刷新界面状态。
+  Future<BackupPreview> importBackupBytes(Uint8List bytes) async {
+    final db = _db;
+    if (db == null) throw StateError('数据库还没准备好');
+    final preview = await applyBackup(
+      bytes: bytes,
+      db: db,
+      settings: settings,
+    );
+    await settings.save(_supportDir);
+    await loadMemories();
+    await restoreLatestSession();
+    notifyListeners();
+    await reloadModels();
+    return preview;
   }
 
   /// 本地后端发给模型的最近历史：从最新往前取，控制在 token 预算内

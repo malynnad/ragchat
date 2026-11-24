@@ -59,6 +59,7 @@ GitHub 只镜像代码和 tag，APK 走上面两个国内源（GitHub 上传慢�
 - **长期记忆**：从对话里提取「事实 / 偏好 / 事件 / 关系」四类记忆条目，带重要度；可见、可编辑、可停用、可删除。每轮按重要度排序注入 system。
 - **会话持久化**：关掉 App 再打开，最近会话和轮次都在；「new」开新对话时自动整理上一段对话的记忆。
 - **两槽人设，同一个人**：本地用小模型扛得住的短版「大肥鱼」（六字段，≈139 token），云端用同一个人的长版（≈1.3k 字，整段编辑）。切后端自动换槽位，内容各自保存、互不覆盖。
+- **备份与迁移**：设置 → 07 / STORAGE 一键导出 `.ragchat.zip`（会话 + 记忆 + 人设设置，不含 API key 与模型文件），换机或重装后导入恢复。
 - **语音朗读**：助手回复可一键朗读（系统 TTS，离线免费）；设置里能开新回复自动朗读、调语速与音调。
 - **采样可调**：温度三档（稳定 0.4 / 平衡 0.6 / 活跃 0.9），即时生效。
 - **上下文有数**：页头实时显示会话占用百分比；本地后端只带最近 10 轮 / ≤3600 token 的历史，避免 9B 首答被长历史拖死。
@@ -134,6 +135,8 @@ adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 | 让回答更稳 | 设置 → 04 / SAMPLING → 稳定（即时生效） |
 | 朗读回复 | 气泡底部「朗读」；设置 → 06 / VOICE 开自动朗读、调语速/音调 |
 | 看云端花了多少 | 设置 → 05 / BACKEND 底部「今日 / 累计」 |
+| 导出备份 | 设置 → 07 / STORAGE → 导出备份，存成 `.ragchat.zip` |
+| 导入备份 | 设置 → 07 / STORAGE → 导入备份，**会覆盖**当前会话与记忆 |
 | 删掉全部聊天数据 | 设置 → 07 / STORAGE → 按住「删除聊天数据」直到填满 → 确认（用量账本一起清） |
 | 看上下文用了多少 | 页头右上百分比；满 90% 会提示开新对话 |
 
@@ -182,7 +185,7 @@ RAGchat/
 │   │   └── main.dart        入口（直接进主页 / 模型准备页）
 │   ├── assets/branding/     图标
 │   ├── android/             Android 工程（applicationId: com.dannylam.ragchat）
-│   └── test/                107 个测试（单元 + widget）
+│   └── test/                112 个测试（单元 + widget）
 ├── docs/
 │   ├── adr/                 架构决策记录
 │   ├── specs/               需求规格
@@ -200,7 +203,7 @@ RAGchat/
 ```bash
 cd app
 dart analyze                 # 静态检查
-flutter test                 # 107 个测试，约 15 秒
+flutter test                 # 112 个测试，约 20 秒
 flutter build apk --release --split-per-abi --target-platform android-arm64
 ```
 
@@ -221,7 +224,6 @@ flutter build apk --release --split-per-abi --target-platform android-arm64
 - 2B 模型会跑题、会复读；温度调低能缓解，不能根治。**思考功能不可用**，已固定关闭。
 - 9B 慢在 prefill：长历史首答可能到分钟级，已通过裁剪历史缓解，但体验仍取决于设备与温度。
 - 情景记忆（对话向量检索）还没做，`embedModelPath` 目前只是占位。
-- 导出 / 导入继承（US-23）未实现，换设备暂时只能靠整份数据库。
 - 只在 Android 上验证过；iOS 和桌面端没有构建目标。
 - 项目尚未声明开源许可，使用前请先联系作者。
 

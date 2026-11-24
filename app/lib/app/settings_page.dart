@@ -1,10 +1,12 @@
 // ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 
 import '../chat/app_db.dart';
 import '../rag/model_catalog.dart';
+import 'backup.dart';
 import '../rag/pricing.dart';
 import '../rag/token_budget.dart';
 import 'app_state.dart';
@@ -310,6 +312,40 @@ class SettingsPage extends StatelessWidget {
           row('模型文件', formatBytes(stats.modelBytes)),
           const Divider(height: 1),
           Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: [
+                CupertinoButton(
+                  key: const ValueKey('export-backup'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  minimumSize: Size.zero,
+                  onPressed: () => _exportBackup(context, state),
+                  child: Text(
+                    '导出备份',
+                    style: TextStyle(fontSize: kFontBody, color: label),
+                  ),
+                ),
+                CupertinoButton(
+                  key: const ValueKey('import-backup'),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 6,
+                  ),
+                  minimumSize: Size.zero,
+                  onPressed: () => _importBackup(context, state),
+                  child: Text(
+                    '导入备份',
+                    style: TextStyle(fontSize: kFontBody, color: label),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1),
+          Padding(
             padding: const EdgeInsets.symmetric(vertical: 10),
             child: HoldToConfirmButton(
               key: const ValueKey('delete-db'),
@@ -320,6 +356,71 @@ class SettingsPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  /// 导出：打包成 .ragchat.zip，交给系统文件选择器保存。
+  Future<void> _exportBackup(BuildContext context, AppState state) async {
+    try {
+      final bytes = await state.exportBackupBytes();
+      final now = DateTime.now();
+      final stamp =
+          '${now.year}${now.month.toString().padLeft(2, '0')}'
+          '${now.day.toString().padLeft(2, '0')}-'
+          '${now.hour.toString().padLeft(2, '0')}'
+          '${now.minute.toString().padLeft(2, '0')}';
+      final uri = await FilePicker.saveFile(
+        fileName: 'ragchat-$stamp.ragchat.zip',
+        bytes: bytes,
+        mimeType: 'application/zip',
+        dialogTitle: '保存 RAGchat 备份',
+      );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(uri == null ? '已取消保存' : '备份已保存'),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导出失败：$e')),
+      );
+    }
+  }
+
+  /// 导入：选文件 → 预览条数 → 二次确认 → 覆盖恢复。
+  Future<void> _importBackup(BuildContext context, AppState state) async {
+    final picked = await FilePicker.pickFile(
+      type: FileType.custom,
+      allowedExtensions: ['zip'],
+      dialogTitle: '选择 .ragchat.zip',
+    );
+    if (picked == null) return;
+    final bytes = await picked.readAsBytes();
+    if (!context.mounted) return;
+    try {
+      final preview = inspectBackup(bytes);
+      final ok = await showIosConfirm(
+        context: context,
+        title: '导入备份',
+        message:
+            '将覆盖当前全部会话与记忆，并恢复人设/温度/语音/后端设置。'
+            'API key 与模型路径不受影响。\n\n备份内容：${preview.summary}',
+        confirmLabel: '覆盖导入',
+        destructive: true,
+      );
+      if (!ok) return;
+      final applied = await state.importBackupBytes(bytes);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已导入：${applied.summary}')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('导入失败：$e')),
+      );
+    }
   }
 
   /// 采样参数：温度三档即时生效；思考开关要重载模型。

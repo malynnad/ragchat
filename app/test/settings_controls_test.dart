@@ -70,6 +70,20 @@ void main() {
     expect(find.text('当前 0.4'), findsOneWidget);
   });
 
+  testWidgets('存储区有导出/导入备份入口', (tester) async {
+    final state = await buildState();
+    await tester.pumpWidget(wrap(state));
+    await tester.pump();
+
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('export-backup')),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.byKey(const ValueKey('export-backup')), findsOneWidget);
+    expect(find.byKey(const ValueKey('import-backup')), findsOneWidget);
+  });
+
   testWidgets('按住删除按钮填满才弹确认；点一下不弹', (tester) async {
     final state = await buildState();
     await tester.pumpWidget(wrap(state));

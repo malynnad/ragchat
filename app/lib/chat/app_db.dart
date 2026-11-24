@@ -363,6 +363,81 @@ class AppDb {
     ];
   }
 
+  /// 导出用：全部会话 + 轮次（纯 JSON 结构，不含 rowid）。
+  Future<List<Map<String, Object?>>> dumpSessions() async {
+    final sessions = await _db.query('sessions', orderBy: 'rowid ASC');
+    final turns = await _db.query(
+      'turns',
+      orderBy: 'session_id ASC, turn_index ASC',
+    );
+    final bySession = <String, List<Map<String, Object?>>>{};
+    for (final t in turns) {
+      bySession
+          .putIfAbsent(t['session_id'] as String, () => [])
+          .add({
+            'question': t['question'],
+            'answer': t['answer'],
+            'createdAt': t['created_at'],
+          });
+    }
+    return [
+      for (final s in sessions)
+        {
+          'id': s['id'],
+          'createdAt': s['created_at'],
+          'updatedAt': s['updated_at'],
+          'turns': bySession[s['id']] ?? const [],
+        },
+    ];
+  }
+
+  /// 导入用：整库替换会话与记忆（在同一个事务里，失败自动回滚）。
+  Future<void> restoreAll({
+    required List<Map<String, Object?>> sessions,
+    required List<MemoryEntry> memories,
+  }) async {
+    await _db.transaction((txn) async {
+      await txn.delete('turns');
+      await txn.delete('sessions');
+      await txn.delete('memories');
+      for (final s in sessions) {
+        final sid = s['id'] as String;
+        final created = (s['createdAt'] as num?)?.toInt() ?? _now();
+        final updated = (s['updatedAt'] as num?)?.toInt() ?? created;
+        await txn.insert('sessions', {
+          'id': sid,
+          'created_at': created,
+          'updated_at': updated,
+        });
+        final turns = (s['turns'] as List?) ?? const [];
+        for (var i = 0; i < turns.length; i++) {
+          final t = turns[i] as Map<String, dynamic>;
+          await txn.insert('turns', {
+            'session_id': sid,
+            'turn_index': i,
+            'question': t['question'] as String? ?? '',
+            'answer': t['answer'] as String? ?? '',
+            'created_at': (t['createdAt'] as num?)?.toInt() ?? _now(),
+          });
+        }
+      }
+      for (final m in memories) {
+        await txn.insert('memories', {
+          'id': m.id,
+          'content': m.content,
+          'kind': m.kind.name,
+          'importance': m.importance,
+          'embedding': null,
+          'created_at': m.createdAt.millisecondsSinceEpoch,
+          'updated_at': m.updatedAt.millisecondsSinceEpoch,
+          'last_used_at': m.lastUsedAt?.millisecondsSinceEpoch,
+          'source': m.source,
+          'active': m.active ? 1 : 0,
+        });
+      }
+    });
+  }
+
   /// 清空全部会话（清空数据入口用；记忆独立，不受影响）。
   Future<void> deleteAllSessions() async {
     await _db.transaction((txn) async {
