@@ -1,6 +1,7 @@
 // ignore: deprecated_member_use
 import 'package:flutter/cupertino.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:path/path.dart' as p;
 
@@ -118,6 +119,15 @@ class SettingsPage extends StatelessWidget {
                 ),
                 child: Text('准备页', style: TextStyle(fontSize: kFontControl)),
               ),
+              CupertinoButton(
+                key: const ValueKey('calibrate-embed'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                minimumSize: Size.zero,
+                onPressed: busy
+                    ? null
+                    : () => _calibrateEmbedding(context, state),
+                child: Text('标定', style: TextStyle(fontSize: kFontControl)),
+              ),
               const Spacer(),
               CupertinoButton(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -224,6 +234,34 @@ class SettingsPage extends StatelessWidget {
     );
     if (ok) {
       await state.switchModel(isChat: isChat, path: path);
+    }
+  }
+
+  /// 嵌入标定（ADR-0016 第 0 步）：跑固定探针 → 完整报告进剪贴板和日志，
+  /// 弹框只报要点。阈值要等真机数值回来才定，所以这里不做任何写入。
+  Future<void> _calibrateEmbedding(BuildContext context, AppState state) async {
+    try {
+      final report = await state.calibrateEmbedding();
+      final md = report.toMarkdown();
+      await Clipboard.setData(ClipboardData(text: md));
+      if (!context.mounted) return;
+      final timing = report.batchMs == null
+          ? '单条平均 ${report.singleAvgMs} ms'
+          : '单条平均 ${report.singleAvgMs} ms，批量 ${report.batchMs} ms';
+      final verdict = report.warnings.isEmpty
+          ? '没有发现异常'
+          : '${report.warnings.length} 条异常：${report.warnings.first}';
+      await showIosAlert(
+        context: context,
+        title: report.ok ? '标定完成' : '标定有问题',
+        message:
+            '维度 ${report.dim}（期望 ${report.expectedDim}）'
+            '${report.dimOk ? "" : " ✗"}\n'
+            '$timing\n$verdict\n\n完整报告已复制到剪贴板。',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      await showIosAlert(context: context, title: '标定失败', message: '$e');
     }
   }
 

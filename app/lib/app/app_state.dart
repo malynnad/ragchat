@@ -18,6 +18,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../rag/models.dart';
 import '../rag/pricing.dart';
 import '../rag/cloud_gateway.dart';
+import '../rag/embedding_calibration.dart';
 import '../rag/nobodywho_gateway.dart';
 import '../rag/secret_store.dart';
 import '../rag/token_budget.dart';
@@ -62,6 +63,10 @@ class AppState extends ChangeNotifier {
   NobodyWhoGateway? _gateway;
   CloudGateway? _cloud;
   ChatService? _chatService;
+
+  /// 标定专用的嵌入网关（ADR-0016）：云端后端没有本地网关，
+  /// 单独留一个只加载编码器的实例，避免为了标定去加载聊天模型。
+  NobodyWhoGateway? _calibGateway;
 
   /// API key 走系统安全存储；测试可注入 MemorySecretStore。
   SecretStore secretStore = SecureSecretStore();
@@ -576,6 +581,41 @@ class AppState extends ChangeNotifier {
     return _chatService!;
   }
 
+  /// 嵌入标定（ADR-0016 第 0 步）：跑固定探针，量维度、归一化和相似度分布。
+  ///
+  /// 只读不写库。嵌入模型没装就抛错——标定不该在缺模型时假装成功；
+  /// 聊天主路径完全不受影响（这里不碰 [ChatService]）。
+  Future<CalibrationReport> calibrateEmbedding() async {
+    final path = settings.embedModelPath;
+    if (path == null) throw StateError('还没有选择嵌入模型');
+    final gateway = await _embedGatewayFor(path);
+    final report = await EmbeddingCalibration(
+      embed: gateway.embed,
+      embedBatch: gateway.embedBatch,
+      modelLabel: p.basename(path),
+    ).run();
+    // 真机联调时 logcat 里也能看到，别只依赖剪贴板。
+    debugPrint(report.toMarkdown());
+    return report;
+  }
+
+  /// 取一个能跑嵌入的网关：优先复用已加载的，其次标定缓存，最后新建。
+  Future<NobodyWhoGateway> _embedGatewayFor(String path) async {
+    final live = _gateway;
+    if (live != null && live.embedModelId == path) return live;
+    if (_calibGateway?.embedModelId == path) return _calibGateway!;
+    await _calibGateway?.dispose();
+    // chatModelPath 只是占位：标定只走 embed/embedBatch，
+    // 不会触发聊天模型的加载路径（没选聊天模型的用户也能标定）。
+    final temp = NobodyWhoGateway(
+      chatModelPath: settings.chatModelPath ?? '',
+      embedModelPath: path,
+      useGpu: settings.useGpu,
+    );
+    _calibGateway = temp;
+    return temp;
+  }
+
   /// 进主页时预热模型（真机）。
   Future<void> warmUp() async {
     if (gatewayLoaded) return;
@@ -610,8 +650,10 @@ class AppState extends ChangeNotifier {
     _chatService?.stopGeneration();
     await _gateway?.dispose();
     await _cloud?.dispose();
+    await _calibGateway?.dispose();
     _gateway = null;
     _cloud = null;
+    _calibGateway = null;
     _chatService = null;
     await warmUp();
   }
