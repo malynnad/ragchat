@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ragchat/app/app_state.dart';
 import 'package:ragchat/app/ios_dialogs.dart';
+import 'package:ragchat/app/ios_widgets.dart';
 import 'package:ragchat/app/settings.dart';
 import 'package:ragchat/app/settings_page.dart';
 import 'package:ragchat/app/theme.dart';
@@ -55,6 +56,48 @@ void main() {
       ),
     ),
   );
+
+  testWidgets('设置页在手机宽度（411dp）下不溢出', (tester) async {
+    // 真机 1264×2780 @3x ≈ 411×927 dp。测试默认 800dp 宽，比手机宽一倍，
+    // 卡片里多塞两个按钮根本测不出来——所以这条用例必须自己压窄视口。
+    tester.view.physicalSize = const Size(1264, 2780);
+    tester.view.devicePixelRatio = 3.0;
+    addTearDown(tester.view.reset);
+    // 系统字号放大时 Flutter 会等比放大所有文本——真机溢出就是这么来的，
+    // 测试里默认 1.0 永远测不出，必须显式压一个放大档。
+    tester.platformDispatcher.textScaleFactorTestValue = 1.3;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+
+    final state = await buildState();
+    await tester.pumpWidget(wrap(state));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull, reason: '窄屏下不该有 RenderFlex 溢出');
+    expect(find.byKey(const ValueKey('calibrate-embed')), findsOneWidget);
+    expect(find.byKey(const ValueKey('retrieval-eval')), findsOneWidget);
+
+    // 光看「没报溢出」不够：真机上 Row 超宽时 Flutter 会把内容画到卡片外面，
+    // release 下既不报错也不打条纹，只能靠量边界。这里逐行核到底。
+    final card = find
+        .ancestor(
+          of: find.byKey(const ValueKey('calibrate-embed')),
+          matching: find.byType(IosSection),
+        )
+        .first;
+    final cardRect = tester.getRect(card);
+    for (final key in const [
+      'calibrate-embed',
+      'retrieval-eval',
+    ]) {
+      final r = tester.getRect(find.byKey(ValueKey(key)));
+      expect(
+        r.right,
+        lessThanOrEqualTo(cardRect.right),
+        reason: '$key 超出卡片右边界',
+      );
+      expect(r.left, greaterThanOrEqualTo(cardRect.left), reason: '$key 超出左边界');
+    }
+  });
 
   testWidgets('温度三档：点「稳定」写进设置并落盘', (tester) async {
     final state = await buildState();

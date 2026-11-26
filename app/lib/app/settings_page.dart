@@ -119,24 +119,6 @@ class SettingsPage extends StatelessWidget {
                 ),
                 child: Text('准备页', style: TextStyle(fontSize: kFontControl)),
               ),
-              CupertinoButton(
-                key: const ValueKey('calibrate-embed'),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                minimumSize: Size.zero,
-                onPressed: busy
-                    ? null
-                    : () => _calibrateEmbedding(context, state),
-                child: Text('标定', style: TextStyle(fontSize: kFontControl)),
-              ),
-              CupertinoButton(
-                key: const ValueKey('retrieval-eval'),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                minimumSize: Size.zero,
-                onPressed: busy
-                    ? null
-                    : () => _runRetrievalEval(context, state),
-                child: Text('自检', style: TextStyle(fontSize: kFontControl)),
-              ),
               const Spacer(),
               CupertinoButton(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -150,6 +132,36 @@ class SettingsPage extends StatelessWidget {
                     Text('重新加载', style: TextStyle(fontSize: kFontBody)),
                   ],
                 ),
+              ),
+            ],
+          ),
+          // 诊断工具单独一行：和「重新扫描 / 重新加载」挤在一起会把卡片撑破，
+          // 用 Wrap 而不是 Row，窄屏自动折行。
+          Wrap(
+            spacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              Text(
+                '诊断',
+                style: TextStyle(fontSize: kFontCaption, color: secondary),
+              ),
+              CupertinoButton(
+                key: const ValueKey('calibrate-embed'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                onPressed: busy
+                    ? null
+                    : () => _calibrateEmbedding(context, state),
+                child: const Text('标定', style: TextStyle(fontSize: kFontBody)),
+              ),
+              CupertinoButton(
+                key: const ValueKey('retrieval-eval'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                minimumSize: Size.zero,
+                onPressed: busy
+                    ? null
+                    : () => _runRetrievalEval(context, state),
+                child: const Text('自检', style: TextStyle(fontSize: kFontBody)),
               ),
             ],
           ),
