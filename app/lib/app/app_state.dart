@@ -20,6 +20,7 @@ import '../rag/pricing.dart';
 import '../rag/cloud_gateway.dart';
 import '../rag/embedding_calibration.dart';
 import '../rag/embedding_service.dart';
+import '../rag/memory_retrieval.dart';
 import '../rag/nobodywho_gateway.dart';
 import '../rag/secret_store.dart';
 import '../rag/token_budget.dart';
@@ -342,7 +343,44 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 带检索的 system（ADR-0016 第 3 步）：命中排在前面，其余按重要度兜底。
+  /// 嵌入模型没装 / 编码失败 / 索引为空时，与 [systemPrompt] 完全等价。
+  Future<String> systemPromptFor(String question) async {
+    final ordered = await memoriesForPrompt(question);
+    return ChatService.buildSystemPromptWithinBudget(
+      activePersonaCard(),
+      ordered,
+      budget: settings.backend == 'cloud' ? cloudSystemBudget : systemBudgetTokens,
+      includeCatchphrase: settings.backend == 'cloud',
+    );
+  }
+
+  /// 检索后的注入顺序（公开供测试）：权重与阈值见 [rankMemoryHits]。
+  Future<List<MemoryEntry>> memoriesForPrompt(String question) async {
+    final all = activeMemories();
+    final service = embeddingService();
+    if (all.isEmpty || service == null) return all;
+    final query = await service.embedQuery(question);
+    if (query == null) return all;
+    final index = await service.loadIndex();
+    if (index.isEmpty) {
+      debugPrint('检索：索引为空（向量还没补完），回退纯重要度');
+      return all;
+    }
+    final hits = rankMemoryHits(query: query, index: index);
+    // 无条件打一行：最高分是「阈值定得对不对」的唯一现场证据，
+    // 只在命中时打日志，就分不清「没命中」和「没跑」。
+    final best = rankMemoryHits(query: query, index: index, threshold: 0, topK: 1);
+    debugPrint(
+      '检索：索引 ${index.length} 条，命中 ${hits.length} 条，'
+      '最高分 ${best.isEmpty ? "-" : best.first.cosine.toStringAsFixed(3)}'
+      '${hits.isEmpty ? "" : "（${hits.first.memory.content}）"}',
+    );
+    return orderMemoryPrompt(all: all, hits: hits);
+  }
+
   /// system 消息文本：人设卡 + 核心记忆（预算内截断），每轮重建。
+  /// 纯重要度序，[systemPromptFor] 的降级路径与单测都靠它。
   /// 云端上下文大得多，长人设 + 更多记忆也能装下（ADR-0013）。
   String systemPrompt() => ChatService.buildSystemPromptWithinBudget(
     activePersonaCard(),

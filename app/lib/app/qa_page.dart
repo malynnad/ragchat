@@ -150,10 +150,13 @@ class _QaPageState extends State<QaPage> with WidgetsBindingObserver {
     _startWatchdog(assistant);
     try {
       final service = await state.ensureChat();
+      // 检索要编码查询（实测 58 ms），放在首字之前；失败会回退纯重要度。
+      final prompt = await state.systemPromptFor(q);
+      if (!mounted) return;
       _sub = service
           .ask(
             q,
-            systemPrompt: state.systemPrompt(),
+            systemPrompt: prompt,
             history: state.settings.backend == 'cloud'
                 ? state.sessionTurns.toList()
                 : state.promptHistory(),
