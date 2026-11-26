@@ -19,6 +19,7 @@ import '../rag/models.dart';
 import '../rag/pricing.dart';
 import '../rag/cloud_gateway.dart';
 import '../rag/embedding_calibration.dart';
+import '../rag/embedding_service.dart';
 import '../rag/nobodywho_gateway.dart';
 import '../rag/secret_store.dart';
 import '../rag/token_budget.dart';
@@ -67,6 +68,9 @@ class AppState extends ChangeNotifier {
   /// 标定专用的嵌入网关（ADR-0016）：云端后端没有本地网关，
   /// 单独留一个只加载编码器的实例，避免为了标定去加载聊天模型。
   NobodyWhoGateway? _calibGateway;
+
+  /// 记忆嵌入服务（ADR-0016 第 2 步）：换嵌入模型后按 modelId 自动重建。
+  EmbeddingService? _embeddingService;
 
   /// API key 走系统安全存储；测试可注入 MemorySecretStore。
   SecretStore secretStore = SecureSecretStore();
@@ -147,6 +151,46 @@ class AppState extends ChangeNotifier {
   Future<void> loadMemories() async {
     memories = await _db!.allMemories();
     notifyListeners();
+    // 记忆一有变动就顺手补向量：写入、导入、提取都走这里，不用每处都记得调。
+    scheduleEmbeddingBackfill();
+  }
+
+  /// 记忆嵌入服务；嵌入模型没装（或库没开）返回 null，聊天照旧。
+  EmbeddingService? embeddingService() {
+    final path = settings.embedModelPath;
+    final db = _db;
+    if (path == null || db == null) {
+      _embeddingService = null;
+      return null;
+    }
+    final cached = _embeddingService;
+    if (cached != null && cached.modelId == path) return cached;
+    return _embeddingService = EmbeddingService(
+      db: db,
+      modelId: path,
+      log: debugPrint,
+      gateway: () async {
+        // 取不到网关（未装模型/加载失败）就返回 null，由服务侧静默跳过。
+        try {
+          return await _embedGatewayFor(path);
+        } catch (e) {
+          debugPrint('嵌入网关不可用：$e');
+          return null;
+        }
+      },
+    );
+  }
+
+  /// 后台补算向量：不 await、不抛错、不阻塞任何界面。
+  void scheduleEmbeddingBackfill() {
+    final service = embeddingService();
+    if (service == null) return;
+    unawaited(
+      service.backfill().catchError((Object e) {
+        debugPrint('向量补算失败：$e');
+        return 0;
+      }),
+    );
   }
 
   /// active 记忆按注入序（importance 降序、同分按更新时间新者在前）。
