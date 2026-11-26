@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:ragchat/chat/app_db.dart';
+import 'package:ragchat/rag/vector_math.dart';
 import 'package:ragchat/rag/models.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:test/test.dart';
@@ -123,6 +124,158 @@ void main() {
       await store.deleteAllSessions();
       expect(await store.latestSession(), isNull);
       expect(await store.sessionTurns(s1.id), isEmpty, reason: '清会话不影响记忆');
+    });
+  });
+
+  group('v4→v5 迁移（ADR-0016 向量列）', () {
+    test('老记忆完好，向量列补齐后可写', () async {
+      final dir = await Directory.systemTemp.createTemp('mem_v5');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final path = '${dir.path}/rag.db';
+
+      // 手写 v4 schema（memories 还没有 embedding_model / embedded_at）。
+      final v4 = await databaseFactoryFfi.openDatabase(
+        path,
+        options: OpenDatabaseOptions(
+          version: 4,
+          onCreate: (db, version) async {
+            await db.execute('''
+              CREATE TABLE memories(
+                id TEXT PRIMARY KEY,
+                content TEXT NOT NULL,
+                kind TEXT NOT NULL,
+                importance INTEGER NOT NULL DEFAULT 3,
+                embedding BLOB,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                last_used_at INTEGER,
+                source TEXT,
+                active INTEGER NOT NULL DEFAULT 1
+              )''');
+          },
+        ),
+      );
+      await v4.insert('memories', {
+        'id': 'old',
+        'content': '用户住在杭州',
+        'kind': 'fact',
+        'importance': 4,
+        'created_at': 1700000000000,
+        'updated_at': 1700000000000,
+        'active': 1,
+      });
+      await v4.close();
+
+      final db = await AppDb.openFile(path);
+      addTearDown(db.close);
+
+      // 老数据原样在，且被识别为「待补向量」。
+      final all = await db.allMemories();
+      expect(all.single.content, '用户住在杭州');
+      expect(await db.pendingEmbeddingCount('model-a'), 1);
+      expect(await db.memoryVectors('model-a'), isEmpty);
+
+      // 新列可写：补完就不再待补。
+      await db.setMemoryEmbedding(
+        'old',
+        Float32List.fromList([3, 4]),
+        modelId: 'model-a',
+      );
+      expect(await db.pendingEmbeddingCount('model-a'), 0);
+      expect((await db.memoryVectors('model-a')).single.id, 'old');
+    });
+  });
+
+  group('情景记忆向量（ADR-0016）', () {
+    test('写入后读回是归一化向量，余弦退化成点积', () async {
+      final store = await openMem();
+      addTearDown(store.close);
+      await store.upsertMemory(
+        MemoryEntry(id: 'a', content: '我住在杭州', importance: 4),
+      );
+      await store.setMemoryEmbedding(
+        'a',
+        Float32List.fromList([3, 4]),
+        modelId: 'm',
+      );
+      final v = (await store.memoryVectors('m')).single;
+      expect(v.content, '我住在杭州');
+      expect(v.importance, 4);
+      expect(v.vector[0], closeTo(0.6, 1e-6));
+      expect(l2Norm(v.vector), closeTo(1, 1e-6));
+    });
+
+    test('换模型后旧向量算没算过：不进投影，重新待补', () async {
+      final store = await openMem();
+      addTearDown(store.close);
+      await store.upsertMemory(MemoryEntry(id: 'a', content: '事实'));
+      await store.setMemoryEmbedding(
+        'a',
+        Float32List.fromList([1, 0]),
+        modelId: 'model-a',
+      );
+      expect(await store.pendingEmbeddingCount('model-a'), 0);
+      // 换了模型：同一库里的旧向量对新模型毫无意义。
+      expect(await store.memoryVectors('model-b'), isEmpty);
+      expect(await store.pendingEmbeddingCount('model-b'), 1);
+      expect((await store.memoriesNeedingEmbedding('model-b')).single.id, 'a');
+    });
+
+    test('upsert 覆盖会清掉向量（内容变了就重算）', () async {
+      final store = await openMem();
+      addTearDown(store.close);
+      await store.upsertMemory(MemoryEntry(id: 'a', content: '旧内容'));
+      await store.setMemoryEmbedding(
+        'a',
+        Float32List.fromList([1, 0]),
+        modelId: 'm',
+      );
+      await store.upsertMemory(MemoryEntry(id: 'a', content: '新内容'));
+      expect(await store.memoryVectors('m'), isEmpty);
+      expect(await store.pendingEmbeddingCount('m'), 1);
+    });
+
+    test('停用的条目不进检索投影', () async {
+      final store = await openMem();
+      addTearDown(store.close);
+      await store.upsertMemory(MemoryEntry(id: 'a', content: '事实'));
+      await store.setMemoryEmbedding(
+        'a',
+        Float32List.fromList([1, 0]),
+        modelId: 'm',
+      );
+      await store.deactivateMemory('a');
+      expect(await store.memoryVectors('m'), isEmpty);
+      expect(await store.pendingEmbeddingCount('m'), 0);
+    });
+
+    test('脏 BLOB（长度不是 4 的倍数）跳过，不让检索崩', () async {
+      final raw = await databaseFactoryFfiNoIsolate.openDatabase(
+        inMemoryDatabasePath,
+      );
+      addTearDown(raw.close);
+      final store = await AppDb.fromDatabase(raw);
+      await store.upsertMemory(MemoryEntry(id: 'a', content: '事实'));
+      await raw.update(
+        'memories',
+        {'embedding': Uint8List(7), 'embedding_model': 'm'},
+        where: 'id = ?',
+        whereArgs: ['a'],
+      );
+      expect(await store.memoryVectors('m'), isEmpty);
+    });
+
+    test('批量补算按 importance 降序取，limit 生效', () async {
+      final store = await openMem();
+      addTearDown(store.close);
+      for (var i = 1; i <= 5; i++) {
+        await store.upsertMemory(
+          MemoryEntry(id: 'm$i', content: '事实$i', importance: i),
+        );
+      }
+      final batch = await store.memoriesNeedingEmbedding('m', limit: 2);
+      expect(batch.map((e) => e.importance), [5, 4]);
+      expect(await store.pendingEmbeddingCount('m'), 5);
     });
   });
 

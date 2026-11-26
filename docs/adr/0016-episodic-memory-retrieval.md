@@ -141,6 +141,21 @@ accepted（第 0 步已落地；2026-11-26 真机标定回填，阈值从占位�
 - `app/test/vector_math_test.dart`、`app/test/embedding_calibration_test.dart`（15 例）
 - 2026-11-26 真机标定回填：维度、范数、分布、耗时全部实测，阈值 0.50 / 权重 0.85-0.15 落定
 
+## 落地进度
+
+- **第 0 步（标定）**：完成，见上。
+- **第 1 步（schema v5 + 向量落库）**：完成 2026-11-26。
+  - `memories` 加 `embedding_model` / `embedded_at`；迁移沿用 PRAGMA 逐列幂等加，
+    手写 v4 库实测可升，老记忆原样可见。
+  - 接口：`setMemoryEmbedding` / `memoriesNeedingEmbedding` /
+    `pendingEmbeddingCount` / `memoryVectors`。
+  - **存原始向量、读回时归一化**：BLOB 保留模型原貌（范数 113.4 能直接看到），
+    检索拿到的是余弦可直接点积的归一化向量。
+  - `upsertMemory` 覆盖即清空向量：内容变了旧向量必须作废，交给后台补算。
+  - `setMemoryEmbedding` 不碰 `updated_at`：补算不是用户改动，不该抢排序。
+  - 脏 BLOB（长度不是 4 的倍数）跳过而非抛错：检索宁可少一条也不能崩。
+  - 全量 138 例测试通过（`app_db_test` 新增 7 例，含 v4→v5 迁移）。
+
 ## 参考
 
 - [sqlite-vec](https://github.com/asg017/sqlite-vec)：升级路径，真要进 SQL 检索时看这个

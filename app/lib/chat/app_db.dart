@@ -1,11 +1,32 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:sqflite/sqflite.dart';
 
 import '../rag/models.dart';
+import '../rag/vector_math.dart';
 
 /// 记忆类型（CONTEXT.md 术语：fact/preference/event/relation）。
 enum MemoryKind { fact, preference, event, relation }
+
+/// 检索投影（ADR-0016）：只带检索要用的字段，不拖 MemoryEntry 全量。
+class MemoryVector {
+  const MemoryVector({
+    required this.id,
+    required this.content,
+    required this.importance,
+    required this.vector,
+  });
+
+  final String id;
+  final String content;
+
+  /// 1–5，混合排序时按 0.15 权重参与。
+  final int importance;
+
+  /// 已 L2 归一化，余弦 = 点积。
+  final Float32List vector;
+}
 
 /// 记忆条目：一句稳定事实 + 类型 + 重要度（ADR-0009 复活 ADR-0001）。
 /// 被取代的条目 active=false，不物理删除，可追溯。
@@ -103,7 +124,8 @@ class AppDb {
 
   final Database _db;
 
-  static const int schemaVersion = 4;
+  /// v5 = ADR-0016 情景记忆向量检索：memories 加向量归属与时间。
+  static const int schemaVersion = 5;
 
   /// 打开（或升级）持久化库。旧 v2 库（RAG 版覆盖安装）自动升 v3，数据完好。
   static Future<AppDb> openFile(String path) async {
@@ -188,7 +210,9 @@ class AppDb {
         updated_at INTEGER NOT NULL,
         last_used_at INTEGER,
         source TEXT,
-        active INTEGER NOT NULL DEFAULT 1
+        active INTEGER NOT NULL DEFAULT 1,
+        embedding_model TEXT,
+        embedded_at INTEGER
       )''');
     await db.execute('''
       CREATE TABLE IF NOT EXISTS sessions(
@@ -208,6 +232,17 @@ class AppDb {
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_turns_session ON turns(session_id)',
     );
+    // ---- v5（ADR-0016：向量归属）----
+    // 老库 memories 已存在，CREATE IF NOT EXISTS 不会补列，所以按 PRAGMA 逐列加；
+    // 与 documents.category 同一套幂等写法，v3/v4 库都能升上来。
+    final memCols = await db.rawQuery('PRAGMA table_info(memories)');
+    bool hasMemCol(String name) => memCols.any((c) => c['name'] == name);
+    if (!hasMemCol('embedding_model')) {
+      await db.execute('ALTER TABLE memories ADD COLUMN embedding_model TEXT');
+    }
+    if (!hasMemCol('embedded_at')) {
+      await db.execute('ALTER TABLE memories ADD COLUMN embedded_at INTEGER');
+    }
   }
 
   // ---- 记忆条目 ----
@@ -270,7 +305,10 @@ class AppDb {
     'content': m.content,
     'kind': m.kind.name,
     'importance': m.importance,
-    'embedding': null, // v2 情景记忆再启用，导入导出均不携带
+    // 内容可能变了，旧向量一律作废（ADR-0016）：insert/replace 后由后台补算。
+    'embedding': null,
+    'embedding_model': null,
+    'embedded_at': null,
     'created_at': m.createdAt.millisecondsSinceEpoch,
     'updated_at': m.updatedAt.millisecondsSinceEpoch,
     'last_used_at': m.lastUsedAt?.millisecondsSinceEpoch,
@@ -291,6 +329,87 @@ class AppDb {
     source: r['source'] as String?,
     active: (r['active'] as int) == 1,
   );
+
+  // ---- 情景记忆向量（ADR-0016）----
+
+  /// 写入条目的向量。只动向量三列，不碰 updated_at：
+  /// 补算不是用户改动，不该让它抢到排序前面。
+  Future<void> setMemoryEmbedding(
+    String id,
+    Float32List vector, {
+    required String modelId,
+  }) async {
+    await _db.update(
+      'memories',
+      {
+        'embedding': encodeVector(vector),
+        'embedding_model': modelId,
+        'embedded_at': _now(),
+      },
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  /// 待补向量的 active 条目：没向量、或向量来自别的模型。
+  /// 换模型/换量化后旧向量就是噪音，一律当作没算过（ADR-0016 决策 4）。
+  Future<List<MemoryEntry>> memoriesNeedingEmbedding(
+    String modelId, {
+    int limit = 32,
+  }) async {
+    final rows = await _db.query(
+      'memories',
+      where:
+          'active = 1 AND (embedding IS NULL OR embedding_model IS NULL '
+          'OR embedding_model != ?)',
+      whereArgs: [modelId],
+      orderBy: 'importance DESC, updated_at DESC',
+      limit: limit,
+    );
+    return [for (final r in rows) _memoryFromRow(r)];
+  }
+
+  /// 待补向量条数（记忆页/设置页展示进度用）。
+  Future<int> pendingEmbeddingCount(String modelId) async {
+    final r = await _db.rawQuery(
+      'SELECT COUNT(*) AS n FROM memories '
+      'WHERE active = 1 AND (embedding IS NULL OR embedding_model IS NULL '
+      'OR embedding_model != ?)',
+      [modelId],
+    );
+    return r.first['n'] as int;
+  }
+
+  /// 检索用投影：限定模型、只取 active、向量已归一化（余弦退化成点积）。
+  /// 当前模型下的脏数据（BLOB 长度不对）直接跳过，宁可少一条也不让检索崩。
+  Future<List<MemoryVector>> memoryVectors(String modelId) async {
+    final rows = await _db.query(
+      'memories',
+      columns: ['id', 'content', 'importance', 'embedding'],
+      where: 'active = 1 AND embedding_model = ? AND embedding IS NOT NULL',
+      whereArgs: [modelId],
+    );
+    final out = <MemoryVector>[];
+    for (final r in rows) {
+      final blob = r['embedding'];
+      if (blob is! Uint8List) continue;
+      final Float32List raw;
+      try {
+        raw = decodeVector(blob);
+      } on ArgumentError {
+        continue;
+      }
+      out.add(
+        MemoryVector(
+          id: r['id'] as String,
+          content: r['content'] as String,
+          importance: r['importance'] as int,
+          vector: normalized(raw),
+        ),
+      );
+    }
+    return out;
+  }
 
   // ---- 会话与轮次（ADR-0009：持久化）----
 
