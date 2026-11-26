@@ -1,6 +1,6 @@
 # RAGchat
 
-> **下载 1.3.0（arm64，45 MB）**：[Gitee](https://gitee.com/dannylam/ragchat/releases/tag/v1.3.0) · [GitCode](https://gitcode.com/DannyLam/ragchat/releases/v1.3.0)　｜　sha256 `80b6f818…cb8e6d`
+> **下载 1.4.0（arm64，45 MB）**：[Gitee](https://gitee.com/dannylam/ragchat/releases/tag/v1.4.0) · [GitCode](https://gitcode.com/DannyLam/ragchat/releases/v1.4.0)　｜　sha256 `d028feae…68ef5`
 
 本地优先的**记忆陪聊 App**：模型默认在手机端跑，聊天记录、记忆、人设全部留在本机，不联网也能用；想要更强的对话可以随时切到云端 API。
 
@@ -13,18 +13,18 @@
 
 ## 下载
 
-最新版本 **1.2.0**（arm64，约 45 MB）：
+最新版本 **1.4.0**（arm64，约 45 MB）：
 
-- **Gitee**：<https://gitee.com/dannylam/ragchat/releases/tag/v1.3.0>
-- **GitCode**：<https://gitcode.com/DannyLam/ragchat/releases/v1.3.0>
+- **Gitee**：<https://gitee.com/dannylam/ragchat/releases/tag/v1.4.0>
+- **GitCode**：<https://gitcode.com/DannyLam/ragchat/releases/v1.4.0>
 
 直链（点开就开始下载）：
 
-- Gitee：<https://gitee.com/dannylam/ragchat/releases/download/v1.3.0/RAGchat-1.3.0-arm64.apk>
-- GitCode：<https://gitcode.com/DannyLam/ragchat/releases/download/v1.3.0/RAGchat-1.3.0-arm64.apk>
+- Gitee：<https://gitee.com/dannylam/ragchat/releases/download/v1.4.0/RAGchat-1.4.0-arm64.apk>
+- GitCode：<https://gitcode.com/DannyLam/ragchat/releases/download/v1.4.0/RAGchat-1.4.0-arm64.apk>
 
 ```
-sha256  80b6f818f7a3d09a860953fd22f58a2e8c6b1fff880eb5f367527241d3cb8e6d
+sha256  d028feae9c16e49c63becb790dd01f8a4ac57c421cd4e978eaea14c662b68ef5
 ```
 
 GitHub 只镜像代码和 tag，APK 走上面两个国内源（GitHub 上传慢，也省得两边各传一遍）。
@@ -81,7 +81,7 @@ GitHub 只镜像代码和 tag，APK 走上面两个国内源（GitHub 上传慢�
 
 | 决策 | 结论 |
 | --- | --- |
-| 记忆形态 | 核心记忆用事实条目（字符 bigram 余弦去重），情景记忆留 v2 |
+| 记忆形态 | 核心记忆用事实条目（字符 bigram 余弦去重）+ 情景记忆向量检索（阈值 0.50，ADR-0016） |
 | 人设 | 单卡拆成 local / cloud 两个槽位，同一角色两种长度（ADR-0011、0014） |
 | 界面 | 纸页与档案，单一纸墨色，不做多色主题（ADR-0012） |
 | 思考 | 固定关闭：小模型开思考会自言自语、还会把思考内容喷进气泡 |
@@ -110,7 +110,7 @@ adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 
 1. 进模型准备页，从「下载候选模型」里挑一个下载（会显示进度），或者用「导入本地文件」选手机里的 GGUF
 2. 不想现在下载就点 **「稍后配置，先进入」**——主界面能看，顶部会挂一条提示，之后从设置 → 01 / MODEL → 「准备页」回来配
-3. 配好聊天模型就点「保存并开始聊天」；嵌入模型可选，只有 v2 情景记忆才用得上
+3. 配好聊天模型就点「保存并开始聊天」；嵌入模型可选，装了才会做记忆检索（不装就按重要度排序）
 4. 点左上 `new` 开始对话
 
 ## 模型怎么选
@@ -120,7 +120,7 @@ adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 | Qwen3.5-2B Q4_K_M | 1.28 GB | 速度档：聊得动，但容易跑题、复读 |
 | Qwen3.5-4B Q4_K_M | 2.55 GB | 默认档：2B 语无伦次时换它，手机上仍算能用 |
 | Qwen3.5-9B Q4_K_M | 5.29 GB | 质量档：更稳更少跑题，出字明显慢（短上下文 14–19s/轮，长历史会到分钟级） |
-| Qwen3-Embedding-0.6B Q8_0 | 639 MB | v2 情景记忆用，聊天不必装 |
+| Qwen3-Embedding-0.6B Q8_0 | 639 MB | 记忆检索用，聊天不必装 |
 
 模型不下进 APK，第一次使用时在 App 内下载；源走**魔搭 ModelScope**（国内直连，实测 8 MB/s 级；hf-mirror 的 LFS 会跳海外 Xet，只有 0.5 MB/s）。也可以电脑 `adb push` 到 App 私有目录后点「重新扫描」，或直接用文件选择器导入。
 
@@ -223,7 +223,7 @@ flutter build apk --release --split-per-abi --target-platform android-arm64
 
 - 2B 模型会跑题、会复读；温度调低能缓解，不能根治。**思考功能不可用**，已固定关闭。
 - 9B 慢在 prefill：长历史首答可能到分钟级，已通过裁剪历史缓解，但体验仍取决于设备与温度。
-- 情景记忆（对话向量检索）还没做，`embedModelPath` 目前只是占位。
+- 情景记忆的检索阈值只针对 Qwen3-Embedding-0.6B 标定过；换嵌入模型先在设置里跑一次「标定」。
 - 只在 Android 上验证过；iOS 和桌面端没有构建目标。
 - 项目尚未声明开源许可，使用前请先联系作者。
 
