@@ -106,7 +106,7 @@ class SettingsPage extends StatelessWidget {
                   children: [
                     Icon(CupertinoIcons.refresh, size: 18),
                     SizedBox(width: 4),
-                    Text('重新扫描', style: TextStyle(fontSize: kFontBody)),
+                    Text('重新扫描', style: TextStyle(fontSize: kFontControl)),
                   ],
                 ),
               ),
@@ -129,44 +129,63 @@ class SettingsPage extends StatelessWidget {
                   children: [
                     Icon(CupertinoIcons.play_circle, size: 18),
                     SizedBox(width: 4),
-                    Text('重新加载', style: TextStyle(fontSize: kFontBody)),
+                    Text('重新加载', style: TextStyle(fontSize: kFontControl)),
                   ],
                 ),
               ),
             ],
           ),
-          // 诊断工具单独一行：和「重新扫描 / 重新加载」挤在一起会把卡片撑破，
-          // 用 Wrap 而不是 Row，窄屏自动折行。
-          Wrap(
-            spacing: 2,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              Text(
-                '诊断',
-                style: TextStyle(fontSize: kFontCaption, color: secondary),
-              ),
-              CupertinoButton(
-                key: const ValueKey('calibrate-embed'),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                minimumSize: Size.zero,
-                onPressed: busy
-                    ? null
-                    : () => _calibrateEmbedding(context, state),
-                child: const Text('标定', style: TextStyle(fontSize: kFontBody)),
-              ),
-              CupertinoButton(
-                key: const ValueKey('retrieval-eval'),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                minimumSize: Size.zero,
-                onPressed: busy
-                    ? null
-                    : () => _runRetrievalEval(context, state),
-                child: const Text('自检', style: TextStyle(fontSize: kFontBody)),
-              ),
-            ],
+          const SizedBox(height: 4),
+          // 诊断工具各占一行：按钮 + 灰字说明。挤在一行会把卡片撑破，
+          // 而且没人看得懂「标定」「自检」是干什么的。
+          _diagRow(
+            context,
+            buttonKey: const ValueKey('calibrate-embed'),
+            label: '标定',
+            info: '嵌入模型体检：维度、归一化、相似度分布',
+            onTap: busy ? null : () => _calibrateEmbedding(context, state),
+          ),
+          _diagRow(
+            context,
+            buttonKey: const ValueKey('retrieval-eval'),
+            label: '自检',
+            info: '检索体检：命中数、预算紧张时的排序变化',
+            onTap: busy ? null : () => _runRetrievalEval(context, state),
           ),
         ],
       ),
+    );
+  }
+
+  /// 诊断行：按钮 + 右侧灰字说明。说明用 Expanded 接住，大字号下自动折行。
+  Widget _diagRow(
+    BuildContext context, {
+    required Key buttonKey,
+    required String label,
+    required String info,
+    required VoidCallback? onTap,
+  }) {
+    final secondary = CupertinoColors.secondaryLabel.resolveFrom(context);
+    return Row(
+      children: [
+        CupertinoButton(
+          key: buttonKey,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          minimumSize: Size.zero,
+          onPressed: onTap,
+          child: Text(label, style: const TextStyle(fontSize: kFontControl)),
+        ),
+        Expanded(
+          child: Text(
+            info,
+            style: TextStyle(
+              fontSize: kFontCaption,
+              height: 1.4,
+              color: secondary,
+            ),
+          ),
+        ),
+      ],
     );
   }
 

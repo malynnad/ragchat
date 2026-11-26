@@ -97,6 +97,15 @@ void main() {
       );
       expect(r.left, greaterThanOrEqualTo(cardRect.left), reason: '$key 超出左边界');
     }
+
+    // 标定 / 自检 必须各占一行（挤在一行是大字号下撑破卡片的根源）。
+    final calib = tester.getRect(find.byKey(const ValueKey('calibrate-embed')));
+    final eval = tester.getRect(find.byKey(const ValueKey('retrieval-eval')));
+    expect(
+      eval.top,
+      greaterThanOrEqualTo(calib.bottom),
+      reason: '标定与自检应各占一行',
+    );
   });
 
   testWidgets('温度三档：点「稳定」写进设置并落盘', (tester) async {
