@@ -35,15 +35,13 @@ class ChatService {
     bool includeCatchphrase = true,
   }) {
     final head = persona.render(includeCatchphrase: includeCatchphrase);
-    final used0 = estimateTokens(head) + estimateTokens('\n关于用户的长期记忆：');
-    final contents = <String>[];
-    var used = used0;
-    for (final m in memories) {
-      final cost = estimateTokens('\n- ${m.content}');
-      if (used + cost > budget) break;
-      used += cost;
-      contents.add(m.content);
-    }
+    final fitted = fitMemoriesWithinBudget(
+      persona,
+      memories,
+      budget: budget,
+      includeCatchphrase: includeCatchphrase,
+    );
+    final contents = [for (final m in fitted) m.content];
     if (head.isEmpty && contents.isEmpty) return '';
     final buf = StringBuffer();
     if (head.isNotEmpty) buf.writeln(head);
@@ -54,6 +52,28 @@ class ChatService {
       }
     }
     return buf.toString().trim();
+  }
+
+  /// 预算内真正装得下的记忆（按 [memories] 的顺序贪心装入，装不下即停）。
+  ///
+  /// 单列出来是给「检索自检」用的：要在同一份预算下比较两种排序的差异，
+  /// 不能靠人肉估算 token（ADR-0016 第 4 步）。
+  static List<MemoryEntry> fitMemoriesWithinBudget(
+    PersonaCard persona,
+    List<MemoryEntry> memories, {
+    int budget = systemBudgetTokens,
+    bool includeCatchphrase = true,
+  }) {
+    final head = persona.render(includeCatchphrase: includeCatchphrase);
+    var used = estimateTokens(head) + estimateTokens('\n关于用户的长期记忆：');
+    final out = <MemoryEntry>[];
+    for (final m in memories) {
+      final cost = estimateTokens('\n- ${m.content}');
+      if (used + cost > budget) break;
+      used += cost;
+      out.add(m);
+    }
+    return out;
   }
 
   /// 容量预检（ADR-0006）：预计超 90% 不发起生成，引导开启新对话。

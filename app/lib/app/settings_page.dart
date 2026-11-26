@@ -128,6 +128,15 @@ class SettingsPage extends StatelessWidget {
                     : () => _calibrateEmbedding(context, state),
                 child: Text('标定', style: TextStyle(fontSize: kFontControl)),
               ),
+              CupertinoButton(
+                key: const ValueKey('retrieval-eval'),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                minimumSize: Size.zero,
+                onPressed: busy
+                    ? null
+                    : () => _runRetrievalEval(context, state),
+                child: Text('自检', style: TextStyle(fontSize: kFontControl)),
+              ),
               const Spacer(),
               CupertinoButton(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -266,6 +275,27 @@ class SettingsPage extends StatelessWidget {
     } catch (e) {
       if (!context.mounted) return;
       await showIosAlert(context: context, title: '标定失败', message: '$e');
+    }
+  }
+
+  /// 检索自检（ADR-0016 第 4 步）：报告进剪贴板与日志，弹框只报两组数字。
+  Future<void> _runRetrievalEval(BuildContext context, AppState state) async {
+    try {
+      final eval = await state.runRetrievalEval();
+      await Clipboard.setData(ClipboardData(text: eval.toMarkdown()));
+      if (!context.mounted) return;
+      await showIosAlert(
+        context: context,
+        title: '自检完成',
+        message:
+            '命中 ${eval.hitCount} / ${eval.rows.length} 题'
+            '（cos ≥ ${eval.threshold.toStringAsFixed(2)}）\n'
+            '压力预算下排序被改写 ${eval.changedCount} 题\n\n'
+            '完整报告已复制到剪贴板。',
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      await showIosAlert(context: context, title: '自检失败', message: '$e');
     }
   }
 

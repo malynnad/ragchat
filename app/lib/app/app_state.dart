@@ -21,6 +21,7 @@ import '../rag/cloud_gateway.dart';
 import '../rag/embedding_calibration.dart';
 import '../rag/embedding_service.dart';
 import '../rag/memory_retrieval.dart';
+import '../rag/retrieval_eval.dart';
 import '../rag/nobodywho_gateway.dart';
 import '../rag/secret_store.dart';
 import '../rag/token_budget.dart';
@@ -679,6 +680,24 @@ class AppState extends ChangeNotifier {
     // 真机联调时 logcat 里也能看到，别只依赖剪贴板。
     debugPrint(report.toMarkdown());
     return report;
+  }
+
+  /// 检索自检（ADR-0016 第 4 步）：真实记忆 + 真实向量，比较两种排序在
+  /// 同一份预算下的差别。只读，不写库、不动会话。
+  Future<RetrievalEval> runRetrievalEval() async {
+    final service = embeddingService();
+    if (service == null) throw StateError('还没有选择嵌入模型');
+    final index = await service.loadIndex();
+    if (index.isEmpty) throw StateError('向量还没补完，补完再跑自检');
+    final eval = await evaluateRetrieval(
+      memories: activeMemories(),
+      index: index,
+      persona: activePersonaCard(),
+      embedQuery: service.embedQuery,
+      budget: settings.backend == 'cloud' ? cloudSystemBudget : systemBudgetTokens,
+    );
+    debugPrint(eval.toMarkdown());
+    return eval;
   }
 
   /// 取一个能跑嵌入的网关：优先复用已加载的，其次标定缓存，最后新建。
