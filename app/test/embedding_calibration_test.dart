@@ -44,7 +44,7 @@ void main() {
     expect(report.rawNorm, greaterThan(1));
     expect(report.selfSim, closeTo(1, 1e-6));
     expect(report.batchDrift, isNull, reason: '没给批量实现就不该有偏差值');
-    expect(report.pairs.length, EmbeddingCalibration.probes.length);
+    expect(report.pairs.length, EmbeddingCalibration.defaultProbes.length);
     expect(report.plainTop, isNotNull);
     expect(report.instructionTop, isNotNull);
     expect(report.querySimPlain, isNotNull);
@@ -94,10 +94,63 @@ void main() {
   test('探针句子去重后再嵌入：除同句一致性探针外每句只算一次', () async {
     final seen = <String>[];
     await _harness(onText: seen.add).run();
-    final probe = seen.where(EmbeddingCalibration.probeTexts.contains).toList();
+    final harness = _harness();
+    final probe = seen.where(harness.probeTexts.contains).toList();
     // 首句被刻意嵌入三次：预热、复算一致性、批量对照。
-    expect(probe.toSet().length, EmbeddingCalibration.probeTexts.length);
+    expect(probe.toSet().length, harness.probeTexts.length);
     expect(probe.length - probe.toSet().length, 2, reason: '只有「我住在杭州。」该重复出现');
+  });
+
+  test('给出建议阈值：取地板与最低中档的中点，且两侧都有余量', () async {
+    final report = await _harness().run();
+    expect(report.noiseFloor, isNotNull);
+    expect(report.lowestMid, isNotNull);
+    final floor = report.noiseFloor!;
+    final mid = report.lowestMid!;
+    // 词袋假向量下 low/mid 可能贴得很近，但只要没塌陷就该给出建议值
+    if (floor < mid) {
+      expect(report.suggestedThreshold, isNotNull);
+      expect(report.suggestedThreshold!, greaterThanOrEqualTo(floor));
+      expect(report.suggestedThreshold!, lessThanOrEqualTo(mid));
+    }
+    expect(report.toMarkdown(), contains('### 建议阈值'));
+  });
+
+  test('分布塌陷（无关和中档一样像）→ 报警告且不给建议阈值', () async {
+    final same = Float32List.fromList([1, 0, 0, 0]);
+    final report = await EmbeddingCalibration(
+      embed: (_) async => same,
+      expectedDim: 4,
+    ).run();
+    expect(report.noiseFloor, 1.0);
+    expect(report.lowestMid, 1.0);
+    expect(report.suggestedThreshold, isNull);
+    expect(report.warnings.any((w) => w.contains('塌陷')), isTrue);
+    expect(report.toMarkdown(), contains('无法给出：分布塌陷'));
+  });
+
+  test('「完全无关」只有一对时，报告要自曝地板是单点证据', () async {
+    final report = await EmbeddingCalibration(
+      embed: (t) async => _bagOfChars(t),
+      expectedDim: 16,
+      probes: const [
+        ProbePair('无关', '东边的路灯坏了。', '咖啡豆要现磨。', ProbeExpect.low),
+        ProbePair('中', '东边的路灯坏了。', '路口的井盖松了。', ProbeExpect.mid),
+      ],
+    ).run();
+    expect(report.notes.any((n) => n.contains('单点')), isTrue);
+  });
+
+  test('一对无关探针都没有 → 明说阈值只能拍脑袋', () async {
+    final report = await EmbeddingCalibration(
+      embed: (t) async => _bagOfChars(t),
+      expectedDim: 16,
+      probes: const [
+        ProbePair('同义', '我住在杭州。', '我家在杭州。', ProbeExpect.high),
+      ],
+    ).run();
+    expect(report.warnings.any((w) => w.contains('拍脑袋')), isTrue);
+    expect(report.noiseFloor, isNull);
   });
 
   test('markdown 报告含结论与探针表，空警告写「无」', () async {
@@ -105,6 +158,7 @@ void main() {
     expect(md, contains('## 嵌入标定报告'));
     expect(md, contains('维度：16（期望 16）'));
     expect(md, contains('| 探针 | 档位 | 余弦 | 判定 |'));
+    expect(md, contains('### 建议阈值'));
     expect(md, contains('### 指令前缀'));
     expect(md, contains('### 警告'));
   });

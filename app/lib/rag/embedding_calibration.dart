@@ -56,6 +56,9 @@ class CalibrationReport {
     required this.selfSim,
     required this.batchDrift,
     required this.pairs,
+    required this.noiseFloor,
+    required this.lowestMid,
+    required this.suggestedThreshold,
     required this.instructionTop,
     required this.plainTop,
     required this.querySimPlain,
@@ -79,6 +82,16 @@ class CalibrationReport {
   final double selfSim;
   final double? batchDrift;
   final List<PairScore> pairs;
+
+  /// 「完全无关」里的最高分：噪音地板，低于它的阈值等于没筛。
+  final double? noiseFloor;
+
+  /// 「中」档里的最低分：沾边关系的下限。
+  final double? lowestMid;
+
+  /// 建议阈值 = 地板与最低中档的中点（两侧余量相等）。分布塌陷时为 null。
+  final double? suggestedThreshold;
+
   final String? plainTop;
   final String? instructionTop;
   final double? querySimPlain;
@@ -115,6 +128,18 @@ class CalibrationReport {
             '| ${s.pair.label} | ${s.pair.expect.name} | '
                 '${s.cosine.toStringAsFixed(4)} | ${s.suspicious ? "⚠" : "ok"} |',
         ].join('\n'),
+      )
+      ..writeln()
+      ..writeln('### 建议阈值')
+      ..writeln(
+        '- 噪音地板（无关对最高分）：'
+        '${noiseFloor?.toStringAsFixed(4) ?? "未测"}'
+        '（${pairs.where((s) => s.pair.expect == ProbeExpect.low).length} 对）',
+      )
+      ..writeln('- 最低「中」档：${lowestMid?.toStringAsFixed(4) ?? "未测"}')
+      ..writeln(
+        '- 建议阈值（取两者中点）：'
+        '${suggestedThreshold?.toStringAsFixed(2) ?? "无法给出：分布塌陷"}',
       )
       ..writeln()
       ..writeln('### 指令前缀（Qwen3 推荐 query 加 Instruct）')
@@ -155,6 +180,7 @@ class EmbeddingCalibration {
     this.embedBatch,
     this.modelLabel = '',
     this.expectedDim = defaultDim,
+    this.probes = defaultProbes,
   });
 
   /// Qwen3-Embedding-0.6B 的 hidden size；换模型必须同步改（ADR-0016）。
@@ -164,20 +190,26 @@ class EmbeddingCalibration {
   /// 这里只用来量它到底有没有影响，不当作默认行为。
   static const String instruction = 'Instruct: 从记忆条目里找出与用户问题最相关的事实\nQuery: ';
 
-  /// 固定探针：中文短事实 + 一句跨语言 + 一句无关。
+  /// 固定探针：中文短事实 + 一句跨语言 + 四对无关。
+  ///
+  /// 「完全无关」故意给到四对、且换锚点：噪音地板是阈值的地基，一对撑不起结论
+  /// （首轮真机标定就吃了这个亏，0.385 只是单点证据）。
   /// 改动这里要同步 ADR 的标定记录，否则历史和现在没法比。
-  static const List<ProbePair> probes = [
+  static const List<ProbePair> defaultProbes = [
     ProbePair('改写同义', '我住在杭州。', '我家在杭州。', ProbeExpect.high),
     ProbePair('同义加词', '我住在杭州。', '我平时都住在杭州。', ProbeExpect.high),
     ProbePair('地点相关不同', '我住在杭州。', '杭州的西湖很有名。', ProbeExpect.mid),
     ProbePair('同城不同事', '我住在杭州。', '我在上海上班。', ProbeExpect.mid),
-    ProbePair('完全无关', '我住在杭州。', '今天天气不错。', ProbeExpect.low),
+    ProbePair('无关·天气', '我住在杭州。', '今天天气不错。', ProbeExpect.low),
+    ProbePair('无关·工作', '我住在杭州。', '公司在做年度预算。', ProbeExpect.low),
+    ProbePair('无关·搬家', '我养了一只猫。', '下个月要交房租。', ProbeExpect.low),
+    ProbePair('无关·周末', '昨天看了一部老电影。', '我周末喜欢爬山。', ProbeExpect.low),
     ProbePair('跨语言同义', '我住在杭州。', 'I live in Hangzhou.', ProbeExpect.cross),
     ProbePair('同类不同事', '今天天气不错。', '明天要下雨，记得带伞。', ProbeExpect.mid),
   ];
 
   /// 探针用到的全部句子（去重，保证缓存生效）。
-  static List<String> get probeTexts => {
+  List<String> get probeTexts => {
     for (final p in probes) ...[p.a, p.b],
   }.toList();
 
@@ -187,6 +219,7 @@ class EmbeddingCalibration {
   final EmbedBatchFn? embedBatch;
   final String modelLabel;
   final int expectedDim;
+  final List<ProbePair> probes;
 
   Future<CalibrationReport> run() async {
     final warnings = <String>[];
@@ -268,6 +301,41 @@ class EmbeddingCalibration {
       }
     }
 
+    // 地板与建议阈值：全靠 low / mid 两组探针，缺组就明说，不编。
+    final lows = pairs
+        .where((s) => s.pair.expect == ProbeExpect.low)
+        .map((s) => s.cosine)
+        .toList();
+    final mids = pairs
+        .where((s) => s.pair.expect == ProbeExpect.mid)
+        .map((s) => s.cosine)
+        .toList();
+    double? noiseFloor;
+    double? lowestMid;
+    double? suggested;
+    if (lows.isEmpty) {
+      warnings.add('没有「完全无关」探针：噪音地板无从估计，阈值只能拍脑袋');
+    } else {
+      noiseFloor = lows.reduce((a, b) => a > b ? a : b);
+      if (lows.length < 2) {
+        notes.add('「完全无关」只有 1 对：地板是单点证据，再加几对才钉得实');
+      }
+    }
+    if (mids.isNotEmpty) {
+      lowestMid = mids.reduce((a, b) => a < b ? a : b);
+    }
+    if (noiseFloor != null && lowestMid != null) {
+      if (noiseFloor >= lowestMid) {
+        warnings.add(
+          '无关对最高分 ${noiseFloor.toStringAsFixed(3)} ≥ 最低「中」档 '
+          '${lowestMid.toStringAsFixed(3)}：分布塌陷，这套阈值不能用',
+        );
+      } else {
+        // 中点让「漏检」和「误检」两侧余量相等；取两位小数，方便写进配置。
+        suggested = ((noiseFloor + lowestMid) / 2 * 100).round() / 100;
+      }
+    }
+
     final plain = await embed(_query);
     final instructed = await embed('$instruction$_query');
     final plainTop = _topMatch(plain, singles);
@@ -290,6 +358,9 @@ class EmbeddingCalibration {
       selfSim: selfSim,
       batchDrift: batchDrift,
       pairs: pairs,
+      noiseFloor: noiseFloor,
+      lowestMid: lowestMid,
+      suggestedThreshold: suggested,
       plainTop: plainTop,
       instructionTop: instructionTop,
       querySimPlain: cosineSimilarity(plain, singles[fixed]!),

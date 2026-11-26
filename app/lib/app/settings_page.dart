@@ -251,13 +251,17 @@ class SettingsPage extends StatelessWidget {
       final verdict = report.warnings.isEmpty
           ? '没有发现异常'
           : '${report.warnings.length} 条异常：${report.warnings.first}';
+      final threshold = report.suggestedThreshold == null
+          ? '阈值无法给出（分布塌陷）'
+          : '建议阈值 ${report.suggestedThreshold!.toStringAsFixed(2)}'
+                '（地板 ${report.noiseFloor!.toStringAsFixed(3)}）';
       await showIosAlert(
         context: context,
         title: report.ok ? '标定完成' : '标定有问题',
         message:
             '维度 ${report.dim}（期望 ${report.expectedDim}）'
             '${report.dimOk ? "" : " ✗"}\n'
-            '$timing\n$verdict\n\n完整报告已复制到剪贴板。',
+            '$timing\n$threshold\n$verdict\n\n完整报告已复制到剪贴板。',
       );
     } catch (e) {
       if (!context.mounted) return;
