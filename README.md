@@ -6,18 +6,18 @@ Flutter + [nobodywho](https://pub.dev/packages/nobodywho)（llama.cpp 的 Flutte
 
 ## 下载
 
-1.4.0，arm64，45 MB：
+1.4.1，arm64，45 MB：
 
-- Gitee：<https://gitee.com/dannylam/ragchat/releases/tag/v1.4.0>
-- GitCode：<https://gitcode.com/DannyLam/ragchat/releases/v1.4.0>
+- Gitee：<https://gitee.com/dannylam/ragchat/releases/tag/v1.4.1>
+- GitCode：<https://gitcode.com/DannyLam/ragchat/releases/v1.4.1>
 
 直链：
 
-- Gitee：<https://gitee.com/dannylam/ragchat/releases/download/v1.4.0/RAGchat-1.4.0-arm64.apk>
-- GitCode：<https://gitcode.com/DannyLam/ragchat/releases/download/v1.4.0/RAGchat-1.4.0-arm64.apk>
+- Gitee：<https://gitee.com/dannylam/ragchat/releases/download/v1.4.1/RAGchat-1.4.1-arm64.apk>
+- GitCode：<https://gitcode.com/DannyLam/ragchat/releases/download/v1.4.1/RAGchat-1.4.1-arm64.apk>
 
 ```
-sha256  d028feae9c16e49c63becb790dd01f8a4ac57c421cd4e978eaea14c662b68ef5
+sha256  9a2a0b38cc4ec0e2094a980eaaba2147691eac4d1358524f1dbf817cf0c3e339
 ```
 
 GitHub 只镜像代码和 tag，APK 走上面两个国内源。仓库：[Gitee](https://gitee.com/dannylam/ragchat)（主）、[GitCode](https://gitcode.com/DannyLam/ragchat)、[GitHub](https://github.com/malynnad/ragchat)。
