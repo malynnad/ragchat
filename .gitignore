@@ -23,3 +23,12 @@ app/android/key.properties
 
 # 本地出包产物（不入库）
 dist/
+
+# 本地留档：内容过时或已不再被引用，文件留在磁盘但不入库
+docs/screenshots/
+docs/architecture.svg
+docs/QA说明书.md
+docs/工作原理与模型选型.md
+docs/release-notes-v1.0.0.md
+docs/specs/2026-11-14-rag-knowledge-base.md
+docs/specs/2026-11-15-v2-update.md
