@@ -1,5 +1,6 @@
 import '../rag/model_gateway.dart';
 import '../rag/models.dart';
+import '../app/format.dart' show nowLabel;
 import '../rag/token_budget.dart'
     show
         contextSafetyFactor,
@@ -35,6 +36,25 @@ class ChatService {
   /// 小模型会顺着编一段）。预算不够就不加，绝不为了它挤掉人设。
   static const String emptyMemoryGuard = '（你还没有关于用户的记忆；不知道就说不记得，不要编。）';
 
+  /// 时间行。小模型对「现在几点」几乎没有概念，不给它就分不清早晚——
+  /// 早上说「晚安」、深夜说「早上好」都是这么来的。写成一句中文人话最管用。
+  /// 措辞是试出来的：只说「现在是 X」时，云端模型仍会答「我看不了时间」——
+  /// 它把「没有实时信息」当成了身份设定。必须明说这是准确时间、可以直接答。
+  static String timeLine(DateTime now) =>
+      '现在是${nowLabel(now)}；这是准确时间，用户问日期、时间、星期就直接回答，'
+      '不要说不知道，也别把早晚说错。';
+
+  /// system 的头部：人设 + 当前时间。人设为空时只留时间行。
+  static String promptHead(
+    PersonaCard persona, {
+    bool includeCatchphrase = true,
+    DateTime? now,
+  }) {
+    final body = persona.render(includeCatchphrase: includeCatchphrase);
+    final line = timeLine(now ?? DateTime.now());
+    return body.isEmpty ? line : '$body\n$line';
+  }
+
   /// system 消息组装（ADR-0009 决策 8，公开供测试断言）：
   /// 人设卡渲染在前，核心记忆清单在后（[memories] 应已按 importance 排序）。
   /// 预算 [budget] 内截断：保证人设卡完整，记忆按序装入，装不下不硬塞。
@@ -43,13 +63,19 @@ class ChatService {
     List<MemoryEntry> memories, {
     int budget = systemBudgetTokens,
     bool includeCatchphrase = true,
+    DateTime? now,
   }) {
-    final head = persona.render(includeCatchphrase: includeCatchphrase);
+    final head = promptHead(
+      persona,
+      includeCatchphrase: includeCatchphrase,
+      now: now,
+    );
     final fitted = fitMemoriesWithinBudget(
       persona,
       memories,
       budget: budget,
       includeCatchphrase: includeCatchphrase,
+      now: now,
     );
     final contents = [for (final m in fitted) m.content];
     if (head.isEmpty && contents.isEmpty) return '';
@@ -77,8 +103,13 @@ class ChatService {
     List<MemoryEntry> memories, {
     int budget = systemBudgetTokens,
     bool includeCatchphrase = true,
+    DateTime? now,
   }) {
-    final head = persona.render(includeCatchphrase: includeCatchphrase);
+    final head = promptHead(
+      persona,
+      includeCatchphrase: includeCatchphrase,
+      now: now,
+    );
     // 收尾那句也占预算：先预留下来，否则截断判断会少算一段。
     var used =
         estimateTokens(head) +

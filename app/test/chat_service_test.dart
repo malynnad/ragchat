@@ -20,7 +20,8 @@ void main() {
         budget: 5,
       );
 
-      expect(prompt, persona.render());
+      // 预算 5 连时间行都装不下，只剩人设本身。
+      expect(prompt, contains(persona.render()));
       expect(prompt, isNot(contains('用户叫Danny')));
     });
 

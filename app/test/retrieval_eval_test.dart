@@ -37,7 +37,9 @@ void main() {
       MemoryEntry(id: 'b', content: '一二三四五'),
       MemoryEntry(id: 'c', content: '一二三四五'),
     ];
-    final head = _persona.render();
+    // 头部含「现在是…」那行，时间固定住才能算准预算（分钟数会变长度）。
+    final fixedNow = DateTime(2026, 11, 28, 21, 7);
+    final head = ChatService.promptHead(_persona, now: fixedNow);
     // 预算里除了人设与表头，还要扣掉收尾那句约束（ChatService.memoryGuard）。
     final base =
         head.length +
@@ -50,11 +52,17 @@ void main() {
         _persona,
         memories,
         budget: fitsTwo,
+        now: fixedNow,
       ).map((m) => m.id),
       ['a', 'b'],
     );
     expect(
-      ChatService.fitMemoriesWithinBudget(_persona, memories, budget: base),
+      ChatService.fitMemoriesWithinBudget(
+        _persona,
+        memories,
+        budget: base,
+        now: fixedNow,
+      ),
       isEmpty,
     );
   });
