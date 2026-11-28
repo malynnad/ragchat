@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../rag/model_gateway.dart';
 import '../rag/models.dart';
@@ -20,25 +23,55 @@ class MemoryService {
   /// vs "用户住在上海"）；无关文本几乎不共享 bigram，得分趋近 0。
   static const double dedupeThreshold = 0.6;
 
-  /// 单次提取最多消费的对话轮数（尾部取最新）。
+  /// 单**批**最多消费的对话轮数。长会话分批跑完，不再只取尾部——
+  /// 只取尾部会让「更早聊过的事」永远进不了记忆（真实踩坑：聊了一整天博物馆，
+  /// 后面又聊了别的，新建对话时博物馆早被挤出窗口）。
   static const int maxTurnsPerRun = 6;
 
-  /// 对 [turns] 做一次提取并落库。返回写入条数（add + update）。
+  /// 单次提取最多跑几批（1 批 = 最多 6 轮）。9B 上一批要几十秒，
+  /// 不设上限会让「新建对话」变成后台跑几分钟。
+  static const int maxBatchesPerRun = 12;
+
+  /// 提取时的「今天」：让事件能写成「2026-11-27 去了博物馆」。
+  /// 可注入，测试里固定住，避免日期漂移导致断言不稳。
+  DateTime Function() now = DateTime.now;
+
+  /// 对 [turns] 分批提取并落库（按时间顺序，从头到尾跑完）。
+  /// 返回写入条数（add + update）。
   /// [sessionId] 作为新条目的 source 记录（可溯源）。
   Future<int> extractFromTurns(
     List<SessionTurn> turns, {
     String? sessionId,
   }) async {
-    final recent = turns.length <= maxTurnsPerRun
-        ? turns
-        : turns.sublist(turns.length - maxTurnsPerRun);
-    if (recent.isEmpty) return 0;
+    if (turns.isEmpty) return 0;
+    var written = 0;
+    var batches = 0;
+    for (var start = 0; start < turns.length; start += maxTurnsPerRun) {
+      if (batches >= maxBatchesPerRun) {
+        debugPrint(
+          '记忆提取：已跑 $maxBatchesPerRun 批，剩余 ${turns.length - start} 轮留到下次',
+        );
+        break;
+      }
+      final batch = turns.sublist(
+        start,
+        math.min(start + maxTurnsPerRun, turns.length),
+      );
+      batches++;
+      final active = await _db.activeMemories();
+      final reply = await _collectReply(batch, active);
+      final plan = _parsePlan(reply);
+      // 解析失败就别继续烧 token：多半是模型这轮已经跑偏了。
+      if (plan == null) break;
+      written += await _applyPlan(plan, sessionId);
+    }
+    if (written > 0) debugPrint('记忆提取：写入 $written 条（$batches 批）');
+    return written;
+  }
 
+  /// 把一份提取计划落库，返回写入条数。
+  Future<int> _applyPlan(_ExtractionPlan plan, String? sessionId) async {
     final active = await _db.activeMemories();
-    final reply = await _collectReply(recent, active);
-    final plan = _parsePlan(reply);
-    if (plan == null) return 0; // 解析失败静默丢弃
-
     var written = 0;
     // 模型显式停用（矛盾/被取代）。
     for (final id in plan.deactivate) {
@@ -93,6 +126,15 @@ class MemoryService {
     return written;
   }
 
+  // ---- 往下是 _collectReply / _buildPrompt / 解析 / 去重 ----
+
+  /// 「今天」的文本形式（YYYY-MM-DD），喂给 prompt 让事件能带上日期。
+  String _todayText() {
+    final d = now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${d.year}-${two(d.month)}-${two(d.day)}';
+  }
+
   /// 收集模型回复（一次性字符串即可，提取不需要流式 UI）。
   Future<String> _collectReply(
     List<SessionTurn> turns,
@@ -111,7 +153,13 @@ class MemoryService {
   /// 短句、结构固定——小模型容错优先。
   ChatMessage _buildPrompt(List<SessionTurn> turns, List<MemoryEntry> active) {
     final buf = StringBuffer();
-    buf.write('从下面的对话里提取值得长期记住的用户事实。\n');
+    buf.write('今天日期：${_todayText()}。\n');
+    buf.write('从下面的对话里提取值得长期记住的用户信息，分四类：\n');
+    buf.write('- fact 事实：名字、住址、工作、常用设备等稳定信息\n');
+    buf.write('- preference 偏好：喜欢或讨厌什么\n');
+    buf.write('- event 事件：用户做过的事、去过的地方、见的人；'
+        '只发生过一次也要记，并写清日期\n');
+    buf.write('- relation 关系：家人、朋友、同事\n');
     if (active.isNotEmpty) {
       buf.write('已有的记忆（不要重复）：\n');
       for (final m in active) {
@@ -127,7 +175,10 @@ class MemoryService {
       '''
 只输出 JSON，格式：
 {"add":[{"content":"新事实","kind":"fact","importance":3}],"update":[{"id":"已有id","content":"改写后的内容"}],"deactivate":["被取代的id"]}
-规则：kind 只能是 fact/preference/event/relation；importance 1-5；没有变化就输出空数组；不要输出 JSON 以外的文字。''',
+规则：kind 只能是 fact/preference/event/relation；importance 1-5；
+事件要带日期（如「2026-11-27 去博物馆看展」）；
+一次性的经历也要提取，不要因为它只发生一次就跳过；
+没有变化就输出空数组；不要输出 JSON 以外的文字。''',
     );
     return ChatMessage(role: ChatRole.user, content: buf.toString());
   }

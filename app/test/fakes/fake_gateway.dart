@@ -16,6 +16,9 @@ class FakeGateway implements ModelGateway {
   /// 最近一次 generate 收到的完整消息表（测试断言用）。
   List<ChatMessage>? lastMessages;
 
+  /// 每次 generate 的完整消息表快照（分批归因用：哪一批喂了哪些轮次）。
+  final List<List<ChatMessage>> messagesLog = [];
+
   /// 可编程回复：非 null 时忽略资料回显逻辑，逐字流式输出此文本（一次）。
   String? nextResponse;
 
@@ -57,6 +60,7 @@ class FakeGateway implements ModelGateway {
   @override
   Stream<String> generate(List<ChatMessage> messages) async* {
     lastMessages = messages;
+    messagesLog.add(List.of(messages));
     _stopped = false;
     // 可编程回复优先（记忆提取等协议化测试注入固定 JSON）。
     final scripted = scriptedResponses.isNotEmpty

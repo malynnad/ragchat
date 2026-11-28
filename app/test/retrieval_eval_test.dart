@@ -38,7 +38,11 @@ void main() {
       MemoryEntry(id: 'c', content: '一二三四五'),
     ];
     final head = _persona.render();
-    final base = head.length + '\n关于用户的长期记忆：'.length;
+    // 预算里除了人设与表头，还要扣掉收尾那句约束（ChatService.memoryGuard）。
+    final base =
+        head.length +
+        '\n关于用户的长期记忆：'.length +
+        ChatService.memoryGuard.length;
     // 每条 '- 一二三四五' 是 1 个换行+连字符+空格+5 字 ≈ 8 token。
     final fitsTwo = base + 8 * 2;
     expect(

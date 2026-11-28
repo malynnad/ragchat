@@ -23,6 +23,21 @@ void main() {
       expect(prompt, persona.render());
       expect(prompt, isNot(contains('用户叫Danny')));
     });
+
+    test('有记忆时补一句「别编」的收尾约束', () {
+      const persona = PersonaCard(id: 'p', name: 'A');
+      final prompt = ChatService.buildSystemPromptWithinBudget(persona, [
+        MemoryEntry(id: 'm1', content: '用户叫Danny', importance: 5),
+      ]);
+      expect(prompt, contains('用户叫Danny'));
+      expect(prompt, contains(ChatService.memoryGuard));
+    });
+
+    test('没有记忆时不加收尾约束（省 token，也避免空口禁令）', () {
+      const persona = PersonaCard(id: 'p', name: 'A');
+      final prompt = ChatService.buildSystemPromptWithinBudget(persona, const []);
+      expect(prompt, isNot(contains(ChatService.memoryGuard)));
+    });
   });
 
   group('chat messages', () {

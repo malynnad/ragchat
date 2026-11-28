@@ -126,7 +126,10 @@ Future<RetrievalEval> evaluateRetrieval({
 }) async {
   // 压力预算按真实数据算：人设 + 记忆表头 + 前 pressureFit 条，正好卡住。
   final head = persona.render();
-  var pressure = estimateTokens(head) + estimateTokens('\n关于用户的长期记忆：');
+  var pressure =
+      estimateTokens(head) +
+      estimateTokens('\n关于用户的长期记忆：') +
+      estimateTokens(ChatService.memoryGuard);
   for (var i = 0; i < memories.length && i < pressureFit; i++) {
     pressure += estimateTokens('\n- ${memories[i].content}');
   }

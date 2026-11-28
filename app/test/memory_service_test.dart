@@ -55,6 +55,59 @@ void main() {
     expect(prompt, contains('fact/preference/event/relation'));
   });
 
+  test('长会话分批跑完：不再只取尾部 6 轮', () async {
+    // 20 轮 → 4 批（6/6/6/2）。每批给一条不同的事实。
+    gateway.scriptedResponses.addAll([
+      '{"add":[{"content":"用户聊到Alpha","kind":"event","importance":3}]}',
+      '{"add":[{"content":"用户聊到Bravo","kind":"event","importance":3}]}',
+      '{"add":[{"content":"用户聊到Charlie","kind":"event","importance":3}]}',
+      '{"add":[{"content":"用户聊到Delta","kind":"event","importance":3}]}',
+    ]);
+    final turns = [for (var i = 0; i < 20; i++) turn('问题$i', '回答$i')];
+
+    final n = await service.extractFromTurns(turns, sessionId: 's-1');
+
+    expect(n, 4);
+    expect(gateway.scriptedResponses, isEmpty, reason: '四批都要跑到');
+    final all = (await db.activeMemories()).map((m) => m.content).toList();
+    expect(
+      all,
+      containsAll(['用户聊到Alpha', '用户聊到Bravo', '用户聊到Charlie', '用户聊到Delta']),
+    );
+    // 顺序也对：第一批喂的是最早 6 轮，不是尾部。
+    final firstPrompt = gateway.messagesLog.first.single.content;
+    expect(firstPrompt, contains('问题0'));
+    expect(firstPrompt, isNot(contains('问题6')));
+    final lastPrompt = gateway.messagesLog.last.single.content;
+    expect(lastPrompt, contains('问题19'));
+  });
+
+  test('某一批解析失败就停手，后面的批次不再烧 token', () async {
+    gateway.scriptedResponses.addAll([
+      '这不是 JSON',
+      '{"add":[{"content":"不该被写入","kind":"fact","importance":3}]}',
+    ]);
+    final turns = [for (var i = 0; i < 12; i++) turn('问题$i', '回答$i')];
+
+    final n = await service.extractFromTurns(turns);
+
+    expect(n, 0);
+    expect(gateway.scriptedResponses, hasLength(1), reason: '第二轮不该被消费');
+    expect(await db.activeMemories(), isEmpty);
+  });
+
+  test('prompt 带今天日期与事件引导（一次性经历也要记）', () async {
+    service.now = () => DateTime(2026, 11, 28);
+    gateway.nextResponse = '{"add":[]}';
+    await service.extractFromTurns([turn('我昨天去博物馆了', '好玩吗？')]);
+
+    final prompt = gateway.lastMessages!.single.content;
+    expect(prompt, contains('2026-11-28'));
+    expect(prompt, contains('event 事件'));
+    expect(prompt, contains('只发生过一次也要记'));
+    expect(prompt, contains('事件要带日期'));
+  });
+
   test('去重：与已有条目 bigram 相似度过阈值 → update 而非 add', () async {
     await db.upsertMemory(
       MemoryEntry(id: 'old', content: '用户住在上海', importance: 3),
@@ -144,13 +197,15 @@ void main() {
     expect(gateway.lastMessages, isNull, reason: '未触发模型');
   });
 
-  test('超长对话只取尾部 maxTurnsPerRun 轮', () async {
-    gateway.nextResponse = '{"add":[]}';
+  test('分批覆盖全部轮次：首批从头开始，末批是尾部', () async {
+    // 10 轮 → 两批（6 + 4）。旧行为是「只取尾部 6 轮」，早期内容永远进不了记忆。
+    gateway.scriptedResponses.addAll(['{"add":[]}', '{"add":[]}']);
     final turns = [for (var i = 0; i < 10; i++) turn('问题$i', '答案$i')];
     await service.extractFromTurns(turns);
 
-    final prompt = gateway.lastMessages!.single.content;
-    expect(prompt, contains('问题9'), reason: '取最新轮');
-    expect(prompt, isNot(contains('问题0')), reason: '早期轮被截断');
+    expect(gateway.messagesLog, hasLength(2));
+    expect(gateway.messagesLog.first.single.content, contains('问题0'));
+    expect(gateway.messagesLog.first.single.content, isNot(contains('问题6')));
+    expect(gateway.messagesLog.last.single.content, contains('问题9'));
   });
 }

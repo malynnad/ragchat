@@ -25,6 +25,16 @@ class ChatService {
   TokenUsage? get lastUsage =>
       gateway is UsageReporting ? (gateway as UsageReporting).lastUsage : null;
 
+  /// 记忆段的收尾约束。小模型在「记忆里没这条」时也会顺着往下编
+  /// （真实反馈：问它昨天去博物馆的细节，它一本正经地假装记得），
+  /// 一句显式禁令比事后道歉有用。
+  static const String memoryGuard =
+      '\n（以上是你能确定的全部记忆；没列到的事就说不记得，不要编。）';
+
+  /// 一条记忆都没有时的同等约束：这场景最容易被编（问「还记得昨天吗」，
+  /// 小模型会顺着编一段）。预算不够就不加，绝不为了它挤掉人设。
+  static const String emptyMemoryGuard = '（你还没有关于用户的记忆；不知道就说不记得，不要编。）';
+
   /// system 消息组装（ADR-0009 决策 8，公开供测试断言）：
   /// 人设卡渲染在前，核心记忆清单在后（[memories] 应已按 importance 排序）。
   /// 预算 [budget] 内截断：保证人设卡完整，记忆按序装入，装不下不硬塞。
@@ -50,6 +60,10 @@ class ChatService {
       for (final c in contents) {
         buf.write('\n- $c');
       }
+      buf.write(memoryGuard);
+    } else if (head.isNotEmpty &&
+        estimateTokens(head) + estimateTokens(emptyMemoryGuard) <= budget) {
+      buf.writeln(emptyMemoryGuard);
     }
     return buf.toString().trim();
   }
@@ -65,7 +79,11 @@ class ChatService {
     bool includeCatchphrase = true,
   }) {
     final head = persona.render(includeCatchphrase: includeCatchphrase);
-    var used = estimateTokens(head) + estimateTokens('\n关于用户的长期记忆：');
+    // 收尾那句也占预算：先预留下来，否则截断判断会少算一段。
+    var used =
+        estimateTokens(head) +
+        estimateTokens('\n关于用户的长期记忆：') +
+        estimateTokens(memoryGuard);
     final out = <MemoryEntry>[];
     for (final m in memories) {
       final cost = estimateTokens('\n- ${m.content}');
